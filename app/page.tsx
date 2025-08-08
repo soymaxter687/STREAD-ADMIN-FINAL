@@ -31,7 +31,7 @@ import { useToast } from "@/hooks/use-toast"
 import { formatearNombreCuenta } from "@/lib/utils"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from 'lucide-react'
-import { Plus, Eye, EyeOff, DollarSign, Users, Trash2, Edit, User, UserCheck, Info, Copy, Check, Search, CalendarIcon, Mail, Lock, Key, AlertCircle, ArrowUp, ArrowDown } from 'lucide-react'
+import { Eye, EyeOff, Trash2, Edit, User, UserCheck, Info, Copy, Check, Search, CalendarIcon, Mail, Lock, Key, ArrowUp, ArrowDown } from 'lucide-react'
 
 
 export default function Dashboard() {

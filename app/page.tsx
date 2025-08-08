@@ -570,20 +570,16 @@ export default function Dashboard() {
     <Label htmlFor="telefono" className="text-right">
       Telefono*
     </Label>
-    <Input
-      id="telefono"
-      value={clienteForm.telefono}
-      onChange={(e) => {
-        let valor = e.target.value.replace(/[^\d+]/g, "");
-        if (!valor.startsWith("+52")) {
-          valor = "+52" + valor.replace(/^\+?52?/, "");
-        }
-        setClienteForm({ ...clienteForm, telefono: valor });
-      }}
-      className="col-span-3"
-      required
-    />
-  </div>
+<Input
+  id="telefono"
+  value={clienteForm.telefono}
+  onChange={(e) => {
+    const valor = e.target.value.replace(/[^\d+]/g, "");
+    setClienteForm({ ...clienteForm, telefono: valor });
+  }}
+  className="col-span-3"
+  required
+/>
 
   <div className="grid grid-cols-4 items-center gap-4">
     <Label htmlFor="email" className="text-right">

@@ -610,6 +610,7 @@ export default function Dashboard() {
       }}
       className="col-span-3"
       placeholder="1234"
+      minLength={4}
       maxLength={4}
       required
     />

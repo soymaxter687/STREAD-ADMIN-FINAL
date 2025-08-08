@@ -34,7 +34,7 @@ export function ClientesTab() {
   const [selectedClientes, setSelectedClientes] = useState<number[]>([])
   const [nuevoCliente, setNuevoCliente] = useState({
     nombre: "",
-    telefono: "+52",
+    telefono: "",
     email: "",
     codigo: "",
     activo: true,
@@ -43,7 +43,7 @@ export function ClientesTab() {
   const resetForm = () => {
     setNuevoCliente({
       nombre: "",
-      telefono: "",
+      telefono: "+52",
       email: "",
       codigo: "",
       activo: true,

@@ -34,7 +34,7 @@ export function ClientesTab() {
   const [selectedClientes, setSelectedClientes] = useState<number[]>([])
   const [nuevoCliente, setNuevoCliente] = useState({
     nombre: "",
-    telefono: "+52",
+    telefono: "",
     email: "",
     codigo: "",
     activo: true,
@@ -43,7 +43,7 @@ export function ClientesTab() {
   const resetForm = () => {
     setNuevoCliente({
       nombre: "",
-      telefono: "+52",
+      telefono: "",
       email: "",
       codigo: "",
       activo: true,
@@ -57,13 +57,8 @@ export function ClientesTab() {
     if (field === "nombre") {
       // Solo letras, espacios, acentos y ñ, convertir a mayúsculas
       processedValue = value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "").toUpperCase()
-    } else if (field === "telefono") {
-    // Solo números y +, sin espacios, siempre empezar con +52
-    processedValue = value.replace(/[^\d+]/g, "")
-    if (!processedValue.startsWith("+52")) {
-      processedValue = "+52" + processedValue.replace(/^\+?52?/, "")
-    }
-  } else if (field === "codigo") {
+    } 
+    else if (field === "codigo") {
       // Solo números, máximo 4 caracteres
       processedValue = value.replace(/\D/g, "").slice(0, 4)
     }
@@ -123,7 +118,7 @@ export function ClientesTab() {
     setEditingCliente(cliente)
     setNuevoCliente({
       nombre: cliente.nombre,
-      telefono: cliente.telefono.startsWith("+52") ? cliente.telefono : "+52" + cliente.telefono,
+      telefono: cliente.telefono,
       email: cliente.email,
       codigo: cliente.codigo || "",
       activo: cliente.activo,

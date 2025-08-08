@@ -529,16 +529,20 @@ export function CuentasTab() {
     if (cuenta.tipo_cuenta === "privada") {
       return perfil.usuario_numero === 1
     }
-    // Si es cuenta compartida, todos los perfiles son editables
+    if (cuenta.tipo_cuenta === "estandar") {
+      return perfil.usuario_numero === 4
+    }
+    // Si es cuenta estandar, 4 perfiles son editables
     return true
   }
+  
 
   const handlePerfilClick = (perfil: any, cuenta: any) => {
     // Verificar si el perfil es editable
     if (!isPerfilEditable(cuenta, perfil)) {
       toast({
         title: "Perfil no disponible",
-        description: "En cuentas privadas solo el primer perfil está disponible",
+        description: "Este tipo de cuenta no permite usar este perfil",
         variant: "destructive",
       })
       return
@@ -889,6 +893,7 @@ ${
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="privada">Privada (1 perfil)</SelectItem>
+                        <SelectItem value="estandar">Estandar (4 perfiles)</SelectItem>
                         <SelectItem value="compartida">Compartida (múltiples perfiles)</SelectItem>
                       </SelectContent>
                     </Select>

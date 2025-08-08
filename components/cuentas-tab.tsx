@@ -28,9 +28,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 
-import { Copy } from "lucide-react"
-import { Button } from "@/components/ui/button"
-
 export function CuentasTab() {
   const {
     servicios,

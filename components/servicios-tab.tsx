@@ -21,6 +21,8 @@ import { useApp } from "@/contexts/app-context"
 import { supabase, type Servicio, type ServicioPin } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { Plus, Edit, Trash2, Settings, Save } from 'lucide-react'
+import { Eye, EyeOff, User, UserCheck, Info, Copy, Check, Search, CalendarIcon, Mail, Lock, Key, ArrowUp, ArrowDown } from 'lucide-react'
+
 
 export function ServiciosTab() {
   const { servicios, refreshServicios, refreshCuentas } = useApp()
@@ -454,31 +456,25 @@ export function ServiciosTab() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-<div className="flex items-end gap-2">
-  <div className="flex-1">
-    <Label className="text-sm">PIN</Label>
-    <Input
-      value={pinConfig?.pin || ""}
-      onChange={(e) => updatePinConfig(usuarioNumero, e.target.value, undefined)}
-      placeholder="1234"
-      maxLength={6}
-      pattern="[0-9]*"
-      inputMode="numeric"
-      readOnly // evita que se modifique si solo quieres copiar
-    />
-  </div>
-  <Button
-    variant="outline"
-    size="sm"
-    onClick={() => {
-      if (pinConfig?.pin) {
-        navigator.clipboard.writeText(pinConfig.pin);
-      }
-    }}
-  >
-    Copiar
-  </Button>
-</div>
+                    <div>
+                        <Label className="text-sm">PIN</Label>
+                        <Input
+                          value={pinConfig?.pin || ""}
+                          onChange={(e) => updatePinConfig(usuarioNumero, e.target.value, undefined)}
+                          placeholder="1234"
+                          maxLength={6}
+                          pattern="[0-9]*"
+                          inputMode="numeric"
+                        />
+                            <Button
+      type="button"
+      variant="outline"
+      size="icon"
+      onClick={() => navigator.clipboard.writeText(cuentaForm.email)}
+    >
+      <Copy className="h-4 w-4" />
+    </Button>
+                      </div>
                       <div>
                         <Label className="text-sm">Nombre del Perfil</Label>
                         <Input 

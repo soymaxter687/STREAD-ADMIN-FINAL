@@ -453,13 +453,14 @@ export function ServiciosTab() {
                       <Badge variant="outline">Perfil {usuarioNumero}</Badge>
                     </div>
 
+                    <div className="grid grid-cols-2 gap-4">
 <div className="flex items-end gap-2">
   <div className="flex-1">
     <Label className="text-sm">PIN</Label>
     <Input
       value={pinConfig?.pin || ""}
       onChange={(e) => updatePinConfig(usuarioNumero, e.target.value, undefined)}
-      placeholder="123456"
+      placeholder="1234"
       maxLength={6}
       pattern="[0-9]*"
       inputMode="numeric"
@@ -478,6 +479,15 @@ export function ServiciosTab() {
     Copiar
   </Button>
 </div>
+                      <div>
+                        <Label className="text-sm">Nombre del Perfil</Label>
+                        <Input 
+                          value={pinConfig?.nombre_usuario || `Usuario ${usuarioNumero}`}
+                          onChange={(e) => updatePinConfig(usuarioNumero, undefined, e.target.value)}
+                          placeholder={`Usuario ${usuarioNumero}`}
+                        />
+                      </div>
+                    </div>
                   </Card>
                 )
               })}

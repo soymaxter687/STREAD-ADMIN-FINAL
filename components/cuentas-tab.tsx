@@ -332,15 +332,7 @@ export function CuentasTab() {
           // Cuenta privada: siempre 1 perfil, sin importar el servicio
           cantidadUsuarios = 1
           console.log("Creando cuenta PRIVADA con 1 perfil")
-        } 
-        
-        else if (cuentaForm.tipo_cuenta === "estandar") {
-          // Cuenta privada: siempre 1 perfil, sin importar el servicio
-          cantidadUsuarios = 4
-          console.log("Creando cuenta estandar con 4 perfil")
-        } 
-
-        else {
+        } else {
           // Cuenta compartida: usar la configuración del servicio
           cantidadUsuarios = servicio.usuarios_por_cuenta || 4
           console.log(`Creando cuenta COMPARTIDA con ${cantidadUsuarios} perfiles`)
@@ -529,20 +521,16 @@ export function CuentasTab() {
     if (cuenta.tipo_cuenta === "privada") {
       return perfil.usuario_numero === 1
     }
-    if (cuenta.tipo_cuenta === "estandar") {
-      return perfil.usuario_numero === 4
-    }
-    // Si es cuenta estandar, 4 perfiles son editables
+    // Si es cuenta compartida, todos los perfiles son editables
     return true
   }
-  
 
   const handlePerfilClick = (perfil: any, cuenta: any) => {
     // Verificar si el perfil es editable
     if (!isPerfilEditable(cuenta, perfil)) {
       toast({
         title: "Perfil no disponible",
-        description: "Este tipo de cuenta no permite usar este perfil",
+        description: "En cuentas privadas solo el primer perfil está disponible",
         variant: "destructive",
       })
       return
@@ -893,7 +881,6 @@ ${
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="privada">Privada (1 perfil)</SelectItem>
-                        <SelectItem value="estandar">Estandar (4 perfiles)</SelectItem>
                         <SelectItem value="compartida">Compartida (múltiples perfiles)</SelectItem>
                       </SelectContent>
                     </Select>
@@ -1307,29 +1294,6 @@ ${
                           ))}
                       </>
                     )}
-                                        {/* Mostrar perfiles deshabilitados para cuentas privadas */}
-                    {cuenta.tipo_cuenta === "estandar" && usuariosCuenta.length > 4 && (
-                      <>
-                        {usuariosCuenta
-                          .filter((u) => u.usuario_numero !== 1)
-                          .slice(0, 3)
-                          .map((perfil) => (
-                            <div key={`disabled-${perfil.id}`} className="relative group">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-12 w-full p-2 border-2 text-gray-200 bg-gray-50 cursor-not-allowed opacity-50"
-                                disabled
-                              >
-                                <User className="h-6 w-6" />
-                              </Button>
-                              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full opacity-0 group-hover:opacity-100 transition-opacity bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
-                                No disponible en cuenta privada
-                              </div>
-                            </div>
-                          ))}
-                      </>
-                    )}
                   </div>
                 </div>
 
@@ -1457,7 +1421,6 @@ ${
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="privada">Privada (1 perfil)</SelectItem>
-                  <SelectItem value="estandar">Estandar (4 perfiles)</SelectItem>
                   <SelectItem value="compartida">Compartida (múltiples perfiles)</SelectItem>
                 </SelectContent>
               </Select>

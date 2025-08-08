@@ -11,7 +11,6 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "StreamAdmin - Gestión de Servicios Digitales",
   description: "Sistema completo para gestionar servicios digitales compartidos",
-    generator: 'v0.dev'
 }
 
 export default function RootLayout({

@@ -28,6 +28,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 
+import { Copy } from "lucide-react"
+import { Button } from "@/components/ui/button"
+
 export function CuentasTab() {
   const {
     servicios,
@@ -913,33 +916,51 @@ ${
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="email" className="text-right">
-                      Email
-                    </Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={cuentaForm.email}
-                      onChange={(e) => setCuentaForm({ ...cuentaForm, email: e.target.value })}
-                      className="col-span-3"
-                      required
-                    />
-                  </div>
+<div className="grid grid-cols-4 items-center gap-4">
+  <Label htmlFor="email" className="text-right">
+    Correo
+  </Label>
+  <div className="col-span-3 flex items-center gap-2">
+    <Input
+      id="email"
+      type="email"
+      value={cuentaForm.email}
+      onChange={(e) => setCuentaForm({ ...cuentaForm, email: e.target.value })}
+      required
+    />
+    <Button
+      type="button"
+      variant="outline"
+      size="icon"
+      onClick={() => navigator.clipboard.writeText(cuentaForm.email)}
+    >
+      <Copy className="h-4 w-4" />
+    </Button>
+  </div>
+</div>
 
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="password" className="text-right">
-                      Contraseña
-                    </Label>
-                    <Input
-                      id="password"
-                      type="text"
-                      value={cuentaForm.password}
-                      onChange={(e) => setCuentaForm({ ...cuentaForm, password: e.target.value })}
-                      className="col-span-3"
-                      required
-                    />
-                  </div>
+<div className="grid grid-cols-4 items-center gap-4">
+  <Label htmlFor="password" className="text-right">
+    Contraseña
+  </Label>
+  <div className="col-span-3 flex items-center gap-2">
+    <Input
+      id="password"
+      type="text"
+      value={cuentaForm.password}
+      onChange={(e) => setCuentaForm({ ...cuentaForm, password: e.target.value })}
+      required
+    />
+    <Button
+      type="button"
+      variant="outline"
+      size="icon"
+      onClick={() => navigator.clipboard.writeText(cuentaForm.password)}
+    >
+      <Copy className="h-4 w-4" />
+    </Button>
+  </div>
+</div>
 
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="vencimiento" className="text-right">

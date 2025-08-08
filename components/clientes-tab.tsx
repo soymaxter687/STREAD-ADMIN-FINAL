@@ -394,6 +394,7 @@ const exportToExcel = () => {
                     onChange={(e) => handleInputChange("codigo", e.target.value)}
                     className="col-span-3"
                     placeholder="1234"
+                    minLength={4}
                     maxLength={4}
                     required
                   />

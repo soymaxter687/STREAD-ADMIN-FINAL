@@ -16,7 +16,7 @@ import { CuentasTab } from "@/components/cuentas-tab"
 import { ClientesTab } from "@/components/clientes-tab"
 import { UsuariosTab } from "@/components/usuarios-tab"
 import { ControlFinanciero } from "@/components/control-financiero"
-import { Users, CreditCard, DollarSign, TrendingUp, Plus, Activity, Target, RefreshCw } from "lucide-react"
+import { Users, CreditCard, DollarSign, TrendingUp, Plus, Activity, Target, RefreshCw } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -29,6 +29,8 @@ import {
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { formatearNombreCuenta } from "@/lib/utils"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from 'lucide-react'
 
 export default function Dashboard() {
   const {
@@ -50,7 +52,7 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false)
   const [clienteForm, setClienteForm] = useState({
     nombre: "",
-    telefono: "",
+    telefono: "+52",
     email: "",
     codigo: "",
   })
@@ -65,6 +67,7 @@ export default function Dashboard() {
     tipo_cuenta: "compartida", // privada o compartida
     activa: true,
   })
+  const [numeroError, setNumeroError] = useState("")
 
   // Refrescar datos cuando cambie de pestaña
   useEffect(() => {
@@ -125,6 +128,31 @@ export default function Dashboard() {
     return cuentas.some((c) => c.nombre === nombreCompleto && c.servicio_id === servicioId)
   }
 
+  // Función para validar número en tiempo real
+  const validarNumero = (servicioId: string, numero: string) => {
+    if (!servicioId || !numero) {
+      setNumeroError("")
+      return true
+    }
+
+    const id = Number.parseInt(servicioId)
+    const servicio = servicios.find((s) => s.id === id)
+
+    if (!servicio) {
+      setNumeroError("")
+      return true
+    }
+
+    if (verificarNumeroExiste(id, numero)) {
+      const nombreFormateado = formatearNombreCuenta(servicio.nombre)
+      setNumeroError(`La cuenta ${nombreFormateado.toUpperCase()}-${numero} ya existe`)
+      return false
+    }
+
+    setNumeroError("")
+    return true
+  }
+
   const resetCuentaForm = () => {
     setCuentaForm({
       servicio_id: "",
@@ -137,6 +165,7 @@ export default function Dashboard() {
       tipo_cuenta: "compartida",
       activa: true,
     })
+    setNumeroError("")
   }
 
   const handleServicioChange = (servicioId: string) => {
@@ -149,13 +178,64 @@ export default function Dashboard() {
       numero_cuenta: proximoNumero,
     }))
 
+    // Validar el número automático
+    validarNumero(servicioId, proximoNumero)
+
     const servicio = servicios.find((s) => s.id === id)
     if (servicio) {
+      // Generar email recomendado basado en el formato del servicio
+      let emailRecomendado = ""
+      if (servicio.formato_correo) {
+        const atIndex = servicio.formato_correo.indexOf("@")
+        if (atIndex !== -1) {
+          const beforeAt = servicio.formato_correo.substring(0, atIndex)
+          const afterAt = servicio.formato_correo.substring(atIndex)
+          emailRecomendado = `${beforeAt}${proximoNumero}${afterAt}`
+        }
+      }
+
+      // Generar contraseña recomendada basada en el nombre del servicio + 6 números aleatorios
+      const nombreServicio = servicio.nombre.toLowerCase().split(' ')[0].replace(/[^a-z0-9]/g, '')
+      const numerosAleatorios = Math.floor(100000 + Math.random() * 900000) // Genera 6 dígitos
+      const passwordRecomendada = `${nombreServicio}${numerosAleatorios}`
+
       setCuentaForm((prev) => ({
         ...prev,
         precio_base: servicio.precio_mensual.toString(),
         precio_cliente: (servicio.precio_mensual * 1.2).toString(),
+        email: emailRecomendado,
+        password: passwordRecomendada,
       }))
+    }
+  }
+
+  const handleNumeroChange = (numero: string) => {
+    setCuentaForm((prev) => ({ ...prev, numero_cuenta: numero }))
+  
+    // Validar el número
+    validarNumero(cuentaForm.servicio_id, numero)
+
+    // Regenerar email y contraseña recomendados cuando cambia el número
+    if (cuentaForm.servicio_id) {
+      const servicio = servicios.find((s) => s.id === Number.parseInt(cuentaForm.servicio_id))
+      if (servicio) {
+        // Regenerar email
+        if (servicio.formato_correo) {
+          const atIndex = servicio.formato_correo.indexOf("@")
+          if (atIndex !== -1) {
+            const beforeAt = servicio.formato_correo.substring(0, atIndex)
+            const afterAt = servicio.formato_correo.substring(atIndex)
+            const emailRecomendado = `${beforeAt}${numero}${afterAt}`
+            setCuentaForm((prev) => ({ ...prev, email: emailRecomendado }))
+          }
+        }
+        
+        // Regenerar contraseña
+        const nombreServicio = servicio.nombre.toLowerCase().split(' ')[0].replace(/[^a-z0-9]/g, '')
+        const numerosAleatorios = Math.floor(100000 + Math.random() * 900000)
+        const passwordRecomendada = `${nombreServicio}${numerosAleatorios}`
+        setCuentaForm((prev) => ({ ...prev, password: passwordRecomendada }))
+      }
     }
   }
 
@@ -182,7 +262,7 @@ export default function Dashboard() {
         description: "Cliente agregado correctamente",
       })
 
-      setClienteForm({ nombre: "", telefono: "", email: "" , codigo: ""})
+      setClienteForm({ nombre: "", telefono: "+52", email: "", codigo: "" })
       setClienteDialogOpen(false)
       await refreshClientes()
     } catch (error: any) {
@@ -201,7 +281,12 @@ export default function Dashboard() {
       const servicioId = Number.parseInt(cuentaForm.servicio_id)
       const numero = cuentaForm.numero_cuenta || "1"
 
-      // Verificar si el número ya existe
+      // Validación final antes de enviar
+      if (!validarNumero(cuentaForm.servicio_id, numero)) {
+        return // El error ya está mostrado
+      }
+
+      // Verificar si el número ya existe (doble verificación)
       if (verificarNumeroExiste(servicioId, numero)) {
         const servicio = servicios.find((s) => s.id === servicioId)
         const nombreFormateado = formatearNombreCuenta(servicio?.nombre || "")
@@ -250,6 +335,12 @@ export default function Dashboard() {
 
       if (errorCuenta) throw errorCuenta
 
+      // Limpiar cualquier usuario existente (por seguridad)
+      await supabase
+        .from("cuenta_usuarios")
+        .delete()
+        .eq("cuenta_id", cuentaCreada.id)
+
       // Crear usuarios según el tipo de cuenta
       const cantidadUsuarios = cuentaForm.tipo_cuenta === "privada" ? 1 : servicio.usuarios_por_cuenta || 4
       const usuariosData = []
@@ -265,9 +356,17 @@ export default function Dashboard() {
         })
       }
 
-      const { error: errorUsuarios } = await supabase.from("cuenta_usuarios").insert(usuariosData)
+      // Insertar usuarios con manejo de errores mejorado
+      const { error: errorUsuarios } = await supabase
+        .from("cuenta_usuarios")
+        .insert(usuariosData)
 
-      if (errorUsuarios) throw errorUsuarios
+      if (errorUsuarios) {
+        console.error("Error al crear usuarios:", errorUsuarios)
+        // Si falla la creación de usuarios, eliminar la cuenta creada
+        await supabase.from("cuentas").delete().eq("id", cuentaCreada.id)
+        throw new Error(`Error al crear los perfiles de usuario: ${errorUsuarios.message}`)
+      }
 
       toast({
         title: "Éxito",
@@ -448,73 +547,78 @@ export default function Dashboard() {
                           <DialogDescription>Agrega un nuevo cliente al sistema</DialogDescription>
                         </DialogHeader>
                         <form onSubmit={handleClienteSubmit} className="space-y-4">
-<div className="grid grid-cols-4 items-center gap-4">
-  <Label htmlFor="nombre" className="text-right">
-    Nombre
-  </Label>
-  <Input
-    id="nombre"
-    value={clienteForm.nombre}
-    onChange={(e) => {
-      const valor = e.target.value.toUpperCase().replace(/[^A-ZÁÉÍÓÚÑ\s]/gi, "");
-      setClienteForm({ ...clienteForm, nombre: valor });
-    }}
-    className="col-span-3"
-    required
-  />
-</div>
+  <div className="grid grid-cols-4 items-center gap-4">
+    <Label htmlFor="nombre" className="text-right">
+      Nombre*
+    </Label>
+    <Input
+      id="nombre"
+      value={clienteForm.nombre}
+      onChange={(e) => {
+        const valor = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "").toUpperCase();
+        setClienteForm({ ...clienteForm, nombre: valor });
+      }}
+      className="col-span-3"
+      placeholder="JORGE PEREZ"
+      required
+    />
+  </div>
 
-<div className="grid grid-cols-4 items-center gap-4">
-  <Label htmlFor="telefono" className="text-right">
-    Teléfono
-  </Label>
-  <Input
-    id="telefono"
-    value={clienteForm.telefono}
-    onChange={(e) => {
-      const valor = e.target.value.replace(/[^0-9]/g, "");
-      setClienteForm({ ...clienteForm, telefono: valor });
-    }}
-    className="col-span-3"
-    required
-  />
-</div>
+  <div className="grid grid-cols-4 items-center gap-4">
+    <Label htmlFor="telefono" className="text-right">
+      Telefono*
+    </Label>
+    <Input
+      id="telefono"
+      value={clienteForm.telefono}
+      onChange={(e) => {
+        let valor = e.target.value.replace(/[^\d+]/g, "");
+        if (!valor.startsWith("+52")) {
+          valor = "+52" + valor.replace(/^\+?52?/, "");
+        }
+        setClienteForm({ ...clienteForm, telefono: valor });
+      }}
+      className="col-span-3"
+      required
+    />
+  </div>
 
-<div className="grid grid-cols-4 items-center gap-4">
-  <Label htmlFor="email" className="text-right">
-    Email
-  </Label>
-  <Input
-    id="email"
-    type="email"
-    value={clienteForm.email}
-    onChange={(e) => {
-      const valor = e.target.value.replace(/\s/g, "");
-      setClienteForm({ ...clienteForm, email: valor });
-    }}
-    className="col-span-3"
-  />
-</div>
+  <div className="grid grid-cols-4 items-center gap-4">
+    <Label htmlFor="email" className="text-right">
+      Correo
+    </Label>
+    <Input
+      id="email"
+      type="email"
+      value={clienteForm.email}
+      onChange={(e) => setClienteForm({ ...clienteForm, email: e.target.value })}
+      className="col-span-3"
+      placeholder="ejemplo@gmail.com"
+    />
+  </div>
 
-<div className="grid grid-cols-4 items-center gap-4">
-  <Label htmlFor="codigo" className="text-right">
-    Código
-  </Label>
-  <Input
-    id="codigo"
-    value={clienteForm.codigo}
-    onChange={(e) => {
-      const valor = e.target.value.replace(/[^0-9]/g, "").slice(0, 4);
-      setClienteForm({ ...clienteForm, codigo: valor });
-    }}
-    className="col-span-3"
-  />
-</div>
+  <div className="grid grid-cols-4 items-center gap-4">
+    <Label htmlFor="codigo" className="text-right">
+      Codigo*
+    </Label>
+    <Input
+      id="codigo"
+      value={clienteForm.codigo}
+      onChange={(e) => {
+        const valor = e.target.value.replace(/\D/g, "").slice(0, 4);
+        setClienteForm({ ...clienteForm, codigo: valor });
+      }}
+      className="col-span-3"
+      placeholder="1234"
+      maxLength={4}
+      required
+    />
+  </div>
 
-                          <DialogFooter>
-                            <Button type="submit">Agregar Cliente</Button>
-                          </DialogFooter>
-                        </form>
+  <DialogFooter>
+    <Button type="submit">Agregar Cliente</Button>
+  </DialogFooter>
+</form>
                       </DialogContent>
                     </Dialog>
 
@@ -579,16 +683,27 @@ export default function Dashboard() {
                             <Label htmlFor="numero_cuenta" className="text-right">
                               Número
                             </Label>
-                            <Input
-                              id="numero_cuenta"
-                              type="number"
-                              min="1"
-                              value={cuentaForm.numero_cuenta}
-                              onChange={(e) => setCuentaForm({ ...cuentaForm, numero_cuenta: e.target.value })}
-                              className="col-span-3"
-                              placeholder="1"
-                              required
-                            />
+                            <div className="col-span-3 space-y-2">
+                              <Input
+                                id="numero_cuenta"
+                                type="number"
+                                min="1"
+                                value={cuentaForm.numero_cuenta}
+                                onChange={(e) => handleNumeroChange(e.target.value)}
+                                className={numeroError ? "border-red-500" : ""}
+                                placeholder="1"
+                                required
+                              />
+                              {numeroError && (
+                                <Alert variant="destructive">
+                                  <AlertCircle className="h-4 w-4" />
+                                  <AlertDescription>{numeroError}</AlertDescription>
+                                </Alert>
+                              )}
+                              <p className="text-xs text-muted-foreground">
+                                Se sugiere automáticamente el primer número disponible
+                              </p>
+                            </div>
                           </div>
 
                           <div className="grid grid-cols-4 items-center gap-4">
@@ -702,7 +817,9 @@ export default function Dashboard() {
                           </div>
 
                           <DialogFooter>
-                            <Button type="submit">Crear Cuenta</Button>
+                            <Button type="submit" disabled={!!numeroError}>
+                              Crear Cuenta
+                            </Button>
                           </DialogFooter>
                         </form>
                       </DialogContent>
@@ -711,37 +828,31 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
-              {/* Servicios más utilizados */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Servicios Más Utilizados</CardTitle>
-                  <CardDescription>Servicios ordenados por número de usuarios asignados</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {serviciosMasUtilizados.length > 0 ? (
-                      serviciosMasUtilizados.map((servicio) => (
-                        <div key={servicio.id} className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <span className="text-2xl">{servicio.emoji}</span>
-                            <div>
-                              <p className="font-medium">{servicio.nombre}</p>
-                              {/*<p className="text-sm text-muted-foreground">${servicio.precio_mensual.toFixed(2)}/mes</p>*/}
-                            </div>
-                          </div>
-                          <Badge variant={servicio.usuariosAsignados > 0 ? "default" : "secondary"}>
-                            {servicio.usuariosAsignados} usuarios
-                          </Badge>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-4">
-                        <p className="text-muted-foreground">No hay servicios configurados</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+<Card className="border rounded-2xl shadow-md">
+  <CardContent>
+    <h2 className="text-lg font-bold mb-4">Servicios más utilizados</h2>
+
+    <div className="space-y-4 max-h-45 overflow-y-auto pr-2 custom-scroll">
+      {serviciosMasUtilizados.length > 0 ? (
+        serviciosMasUtilizados.map((servicio) => (
+          <div key={servicio.id} className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">{servicio.emoji}</span>
+              <p className="font-medium">{servicio.nombre}</p>
+            </div>
+            <Badge variant={servicio.usuariosAsignados > 0 ? "default" : "secondary"}>
+              {servicio.usuariosAsignados} usuarios
+            </Badge>
+          </div>
+        ))
+      ) : (
+        <div className="text-center py-4">
+          <p className="text-muted-foreground">No hay servicios configurados</p>
+        </div>
+      )}
+    </div>
+  </CardContent>
+</Card>
             </div>
           </TabsContent>
 

@@ -171,10 +171,28 @@ export function CuentasTab() {
 
     const servicio = servicios.find((s) => s.id === id)
     if (servicio) {
+      // Generar email recomendado basado en el formato del servicio
+      let emailRecomendado = ""
+      if (servicio.formato_correo) {
+        const atIndex = servicio.formato_correo.indexOf("@")
+        if (atIndex !== -1) {
+          const beforeAt = servicio.formato_correo.substring(0, atIndex)
+          const afterAt = servicio.formato_correo.substring(atIndex)
+          emailRecomendado = `${beforeAt}${proximoNumero}${afterAt}`
+        }
+      }
+
+      // Generar contraseña recomendada basada en el nombre del servicio + 6 números aleatorios
+      const nombreServicio = servicio.nombre.toLowerCase().split(' ')[0].replace(/[^a-z0-9]/g, '')
+      const numerosAleatorios = Math.floor(100000 + Math.random() * 900000) // Genera 6 dígitos
+      const passwordRecomendada = `${nombreServicio}${numerosAleatorios}`
+
       setCuentaForm((prev) => ({
         ...prev,
         precio_base: servicio.precio_mensual.toString(),
         precio_cliente: (servicio.precio_mensual * 1.2).toString(),
+        email: emailRecomendado,
+        password: passwordRecomendada, // Set the recommended password
       }))
     }
   }
@@ -182,11 +200,48 @@ export function CuentasTab() {
   const handleNumeroChange = (numero: string) => {
     setCuentaForm((prev) => ({ ...prev, numero_cuenta: numero }))
     validarNumero(cuentaForm.servicio_id, numero)
+    
+    // Regenerar email y contraseña recomendados cuando cambia el número
+    if (cuentaForm.servicio_id) {
+      const servicio = servicios.find((s) => s.id === Number.parseInt(cuentaForm.servicio_id))
+      if (servicio) {
+        // Regenerar email
+        if (servicio.formato_correo) {
+          const atIndex = servicio.formato_correo.indexOf("@")
+          if (atIndex !== -1) {
+            const beforeAt = servicio.formato_correo.substring(0, atIndex)
+            const afterAt = servicio.formato_correo.substring(atIndex)
+            const emailRecomendado = `${beforeAt}${numero}${afterAt}`
+            setCuentaForm((prev) => ({ ...prev, email: emailRecomendado }))
+          }
+        }
+        
+        // Regenerar contraseña
+        const nombreServicio = servicio.nombre.toLowerCase().split(' ')[0].replace(/[^a-z0-9]/g, '')
+        const numerosAleatorios = Math.floor(100000 + Math.random() * 900000)
+        const passwordRecomendada = `${nombreServicio}${numerosAleatorios}`
+        setCuentaForm((prev) => ({ ...prev, password: passwordRecomendada }))
+      }
+    }
   }
 
   const handleNumeroEditChange = (numero: string) => {
     setCuentaForm((prev) => ({ ...prev, numero_cuenta: numero }))
     validarNumero(cuentaForm.servicio_id, numero, cuentaEditando?.id)
+    
+    // Regenerar email recomendado cuando cambia el número en edición
+    if (cuentaForm.servicio_id) {
+      const servicio = servicios.find((s) => s.id === Number.parseInt(cuentaForm.servicio_id))
+      if (servicio?.formato_correo) {
+        const atIndex = servicio.formato_correo.indexOf("@")
+        if (atIndex !== -1) {
+          const beforeAt = servicio.formato_correo.substring(0, atIndex)
+          const afterAt = servicio.formato_correo.substring(atIndex)
+          const emailRecomendado = `${beforeAt}${numero}${afterAt}`
+          setCuentaForm((prev) => ({ ...prev, email: emailRecomendado }))
+        }
+      }
+    }
   }
 
   const adjustPrice = (field: "precio_base" | "precio_cliente", increment: boolean) => {

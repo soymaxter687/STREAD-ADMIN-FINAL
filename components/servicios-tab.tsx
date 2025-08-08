@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Plus, Edit, Trash2, Settings, Save } from 'lucide-react'
 
 export function ServiciosTab() {
-  const { servicios, refreshServicios } = useApp()
+  const { servicios, refreshServicios, refreshCuentas } = useApp()
   const { toast } = useToast()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingServicio, setEditingServicio] = useState<Servicio | null>(null)
@@ -36,6 +36,7 @@ export function ServiciosTab() {
     usuarios_por_cuenta: 1,
     pin_requerido: false,
     activo: true,
+    formato_correo: "",
   })
 
   const resetForm = () => {
@@ -45,6 +46,7 @@ export function ServiciosTab() {
       usuarios_por_cuenta: 1,
       pin_requerido: false,
       activo: true,
+      formato_correo: "",
     })
     setEditingServicio(null)
   }
@@ -74,7 +76,12 @@ export function ServiciosTab() {
 
     try {
       const servicioData = {
-        ...formData,
+        nombre: formData.nombre,
+        imagen_portada: formData.imagen_portada,
+        usuarios_por_cuenta: formData.usuarios_por_cuenta,
+        pin_requerido: formData.pin_requerido,
+        activo: formData.activo,
+        formato_correo: formData.formato_correo,
         descripcion: "",
         precio_mensual: 0,
         emoji: "📺",
@@ -84,6 +91,58 @@ export function ServiciosTab() {
         const { error } = await supabase.from("servicios").update(servicioData).eq("id", editingServicio.id)
 
         if (error) throw error
+
+        // Si se actualizó el formato de correo, actualizar las cuentas existentes
+        if (servicioData.formato_correo && servicioData.formato_correo !== editingServicio.formato_correo) {
+          try {
+            // Obtener todas las cuentas de este servicio
+            const { data: cuentasServicio, error: errorCuentas } = await supabase
+              .from("cuentas")
+              .select("*")
+              .eq("servicio_id", editingServicio.id)
+
+            if (errorCuentas) {
+              console.error("Error obteniendo cuentas:", errorCuentas)
+            } else if (cuentasServicio && cuentasServicio.length > 0) {
+              // Actualizar el email de cada cuenta según el nuevo formato
+              const actualizaciones = cuentasServicio.map(cuenta => {
+                // Extraer el número de la cuenta del nombre (formato: SERVICIO-NUMERO)
+                const numeroCuenta = cuenta.nombre.split("-")[1] || "1"
+                
+                // Generar nuevo email con el formato actualizado
+                let nuevoEmail = ""
+                if (servicioData.formato_correo) {
+                  const atIndex = servicioData.formato_correo.indexOf("@")
+                  if (atIndex !== -1) {
+                    const beforeAt = servicioData.formato_correo.substring(0, atIndex)
+                    const afterAt = servicioData.formato_correo.substring(atIndex)
+                    nuevoEmail = `${beforeAt}${numeroCuenta}${afterAt}`
+                  }
+                }
+
+                return supabase
+                  .from("cuentas")
+                  .update({ email: nuevoEmail })
+                  .eq("id", cuenta.id)
+              })
+
+              // Ejecutar todas las actualizaciones
+              await Promise.all(actualizaciones)
+
+              toast({
+                title: "Formato actualizado",
+                description: `Se actualizaron ${cuentasServicio.length} cuentas con el nuevo formato de correo`,
+              })
+            }
+          } catch (error) {
+            console.error("Error actualizando cuentas:", error)
+            toast({
+              title: "Advertencia",
+              description: "El servicio se actualizó pero hubo un error al actualizar las cuentas existentes",
+              variant: "destructive",
+            })
+          }
+        }
 
         toast({
           title: "Éxito",
@@ -101,9 +160,11 @@ export function ServiciosTab() {
       }
 
       await refreshServicios()
+      await refreshCuentas()
       setDialogOpen(false)
       resetForm()
     } catch (error: any) {
+      console.error("Error saving service:", error)
       toast({
         title: "Error",
         description: error.message || "Error al guardar el servicio",
@@ -120,6 +181,7 @@ export function ServiciosTab() {
       usuarios_por_cuenta: servicio.usuarios_por_cuenta,
       pin_requerido: servicio.pin_requerido,
       activo: servicio.activo,
+      formato_correo: (servicio as any).formato_correo || "",
     })
     setDialogOpen(true)
   }
@@ -138,6 +200,7 @@ export function ServiciosTab() {
       })
 
       await refreshServicios()
+      await refreshCuentas()
     } catch (error: any) {
       toast({
         title: "Error",
@@ -207,54 +270,54 @@ export function ServiciosTab() {
   }
 
   const updatePinConfig = (usuarioNumero: number, pin?: string, nombreUsuario?: string) => {
-  if (pin !== undefined) {
-    const pinLimpio = pin.replace(/\D/g, "").slice(0, 6)
-    
-    setServiciosPines((prev) => {
-      const updated = [...prev]
-      const index = updated.findIndex((p) => p.usuario_numero === usuarioNumero)
+    if (pin !== undefined) {
+      const pinLimpio = pin.replace(/\D/g, "").slice(0, 6)
+      
+      setServiciosPines((prev) => {
+        const updated = [...prev]
+        const index = updated.findIndex((p) => p.usuario_numero === usuarioNumero)
 
-      if (index >= 0) {
-        updated[index] = { ...updated[index], pin: pinLimpio }
-      } else {
-        updated.push({
-          id: 0,
-          servicio_id: selectedServicio?.id || 0,
-          usuario_numero: usuarioNumero,
-          pin: pinLimpio,
-          nombre_usuario: `Usuario ${usuarioNumero}`,
-          created_at: "",
-          updated_at: "",
-        })
-      }
+        if (index >= 0) {
+          updated[index] = { ...updated[index], pin: pinLimpio }
+        } else {
+          updated.push({
+            id: 0,
+            servicio_id: selectedServicio?.id || 0,
+            usuario_numero: usuarioNumero,
+            pin: pinLimpio,
+            nombre_usuario: `Usuario ${usuarioNumero}`,
+            created_at: "",
+            updated_at: "",
+          })
+        }
 
-      return updated
-    })
+        return updated
+      })
+    }
+
+    if (nombreUsuario !== undefined) {
+      setServiciosPines((prev) => {
+        const updated = [...prev]
+        const index = updated.findIndex((p) => p.usuario_numero === usuarioNumero)
+
+        if (index >= 0) {
+          updated[index] = { ...updated[index], nombre_usuario: nombreUsuario }
+        } else {
+          updated.push({
+            id: 0,
+            servicio_id: selectedServicio?.id || 0,
+            usuario_numero: usuarioNumero,
+            pin: "",
+            nombre_usuario: nombreUsuario,
+            created_at: "",
+            updated_at: "",
+          })
+        }
+
+        return updated
+      })
+    }
   }
-
-  if (nombreUsuario !== undefined) {
-    setServiciosPines((prev) => {
-      const updated = [...prev]
-      const index = updated.findIndex((p) => p.usuario_numero === usuarioNumero)
-
-      if (index >= 0) {
-        updated[index] = { ...updated[index], nombre_usuario: nombreUsuario }
-      } else {
-        updated.push({
-          id: 0,
-          servicio_id: selectedServicio?.id || 0,
-          usuario_numero: usuarioNumero,
-          pin: "",
-          nombre_usuario: nombreUsuario,
-          created_at: "",
-          updated_at: "",
-        })
-      }
-
-      return updated
-    })
-  }
-}
 
   return (
     <div className="space-y-4">
@@ -303,6 +366,19 @@ export function ServiciosTab() {
                   onChange={(e) => setFormData({ ...formData, imagen_portada: e.target.value })}
                   className="col-span-3"
                   placeholder="URL de la imagen"
+                />
+              </div>
+
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="formato_correo" className="text-right">
+                  Formato Correo
+                </Label>
+                <Input
+                  id="formato_correo"
+                  value={formData.formato_correo}
+                  onChange={(e) => setFormData({ ...formData, formato_correo: e.target.value })}
+                  className="col-span-3"
+                  placeholder="ejemplo+servicio@gmail.com"
                 />
               </div>
 

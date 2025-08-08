@@ -103,45 +103,52 @@ export function UsuariosTab() {
   console.log("Debug - cuentaUsuarios:", cuentaUsuarios?.length || 0)
   console.log("Debug - usuariosCompletos:", usuariosCompletos?.length || 0)
 
-  // Filtrar y ordenar usuarios
+  // Filtrar y ordenar usuarios con verificaciones de undefined
   const usuariosFiltrados = useMemo(() => {
-  if (!usuariosCompletos || usuariosCompletos.length === 0) return []
-  
+    if (!usuariosCompletos || usuariosCompletos.length === 0) return []
+
     const filtered = usuariosCompletos.filter((usuario) => {
+      // Verificaciones seguras para evitar errores de undefined
+      const clienteNombre = usuario.cliente?.nombre || ""
+      const clienteTelefono = usuario.cliente?.telefono || ""
+      const servicioNombre = usuario.servicio?.nombre || ""
+      const cuentaNombre = usuario.cuenta?.nombre || ""
+      const nombrePerfil = usuario.nombre_perfil || ""
+      
       const matchBusqueda =
         !busqueda ||
-        usuario.cliente?.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-        usuario.cliente?.telefono.includes(busqueda) ||
-        usuario.servicio?.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-        usuario.cuenta?.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-        usuario.nombre_perfil.toLowerCase().includes(busqueda.toLowerCase())
+        clienteNombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+        clienteTelefono.includes(busqueda) ||
+        servicioNombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+        cuentaNombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+        nombrePerfil.toLowerCase().includes(busqueda.toLowerCase())
 
       const matchServicio = filtroServicio === "todos" || usuario.servicio?.id.toString() === filtroServicio
 
       const matchGrupo = filtroGrupo === "todos" || usuario.cuenta?.id.toString() === filtroGrupo
 
-const matchEstado = (() => {
-  const hoy = new Date()
-  const vencimiento = usuario.fecha_vencimiento_usuario
-    ? new Date(usuario.fecha_vencimiento_usuario + "T00:00:00")
-    : null
+      const matchEstado = (() => {
+        const hoy = new Date()
+        const vencimiento = usuario.fecha_vencimiento_usuario
+          ? new Date(usuario.fecha_vencimiento_usuario + "T00:00:00")
+          : null
 
-  switch (filtroEstado) {
-    case "todos": // ahora solo muestra ocupados
-      return usuario.ocupado
-    case "activo":
-      return usuario.ocupado && (!vencimiento || vencimiento > hoy)
-    case "proximo_vencer":
-      if (!vencimiento || !usuario.ocupado) return false
-      const diffTime = vencimiento.getTime() - hoy.getTime()
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-      return diffDays >= 0 && diffDays <= 7
-    case "vencido":
-      return usuario.ocupado && vencimiento && vencimiento < hoy
-    default:
-      return true
-  }
-})()
+        switch (filtroEstado) {
+          case "todos": // ahora solo muestra ocupados
+            return usuario.ocupado
+          case "activo":
+            return usuario.ocupado && (!vencimiento || vencimiento > hoy)
+          case "proximo_vencer":
+            if (!vencimiento || !usuario.ocupado) return false
+            const diffTime = vencimiento.getTime() - hoy.getTime()
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+            return diffDays >= 0 && diffDays <= 7
+          case "vencido":
+            return usuario.ocupado && vencimiento && vencimiento < hoy
+          default:
+            return true
+        }
+      })()
 
       return matchBusqueda && matchServicio && matchGrupo && matchEstado
     })
@@ -166,8 +173,8 @@ const matchEstado = (() => {
       if (!a.ocupado && b.ocupado) return 1
 
       if (a.ocupado && b.ocupado) {
-        const nombreA = a.cliente?.nombre.toLowerCase() || ""
-        const nombreB = b.cliente?.nombre.toLowerCase() || ""
+        const nombreA = a.cliente?.nombre?.toLowerCase() || ""
+        const nombreB = b.cliente?.nombre?.toLowerCase() || ""
 
         if (ordenAlfabetico === "asc") {
           return nombreA.localeCompare(nombreB)
@@ -178,11 +185,15 @@ const matchEstado = (() => {
 
       // For free users, sort by service and user number with alphabetical order
       if (ordenAlfabetico === "asc") {
-        const servicioCompare = a.servicio?.nombre.localeCompare(b.servicio?.nombre || "") || 0
+        const servicioA = a.servicio?.nombre || ""
+        const servicioB = b.servicio?.nombre || ""
+        const servicioCompare = servicioA.localeCompare(servicioB)
         if (servicioCompare !== 0) return servicioCompare
         return a.usuario_numero - b.usuario_numero
       } else {
-        const servicioCompare = b.servicio?.nombre.localeCompare(a.servicio?.nombre || "") || 0
+        const servicioA = a.servicio?.nombre || ""
+        const servicioB = b.servicio?.nombre || ""
+        const servicioCompare = servicioB.localeCompare(servicioA)
         if (servicioCompare !== 0) return servicioCompare
         return b.usuario_numero - a.usuario_numero
       }
@@ -195,11 +206,17 @@ const matchEstado = (() => {
   }, [filtroServicio])
 
   const clientesFiltrados = useMemo(() => {
+    if (!clientes) return []
+    
     return clientes
       .filter((c) => c.activo)
-      .filter(
-        (c) => c.nombre.toLowerCase().includes(clienteBusqueda.toLowerCase()) || c.telefono.includes(clienteBusqueda),
-      )
+      .filter((c) => {
+        const nombre = c.nombre || ""
+        const telefono = c.telefono || ""
+        const busquedaLower = clienteBusqueda.toLowerCase()
+        
+        return nombre.toLowerCase().includes(busquedaLower) || telefono.includes(clienteBusqueda)
+      })
   }, [clientes, clienteBusqueda])
 
   // Estadísticas
@@ -244,7 +261,7 @@ const matchEstado = (() => {
       fecha_vencimiento: fechaVencimiento,
       costo_personalizado: usuario.asignacion.costo_suscripcion.toString(),
     })
-    setClienteBusqueda(`${usuario.cliente?.nombre} - ${usuario.cliente?.telefono}`)
+    setClienteBusqueda(`${usuario.cliente?.nombre || ""} - ${usuario.cliente?.telefono || ""}`)
     setEditDialogOpen(true)
   }
 
@@ -286,6 +303,7 @@ const matchEstado = (() => {
 
       await refreshUsuarios()
       await refreshAsignaciones()
+      
       setAsignacionDialogOpen(false)
       setPerfilSeleccionado(null)
     } catch (error: any) {
@@ -321,6 +339,7 @@ const matchEstado = (() => {
 
       await refreshUsuarios()
       await refreshAsignaciones()
+      
       setEditDialogOpen(false)
       setAsignacionEditando(null)
       setPerfilSeleccionado(null)
@@ -716,12 +735,12 @@ const matchEstado = (() => {
                         </div>
 
                         <div className="hidden sm:block">
-                          <p className="text-sm font-medium">{usuario.servicio?.nombre}</p>
-                          <p className="text-xs text-muted-foreground">{usuario.cuenta?.nombre}</p>
+                          <p className="text-sm font-medium">{usuario.servicio?.nombre || ""}</p>
+                          <p className="text-xs text-muted-foreground">{usuario.cuenta?.nombre || ""}</p>
                         </div>
 
                         <div className="hidden md:block">
-                          <p className="text-sm font-medium">{usuario.nombre_perfil}</p>
+                          <p className="text-sm font-medium">{usuario.nombre_perfil || ""}</p>
                           {usuario.pin_asignado && (
                             <p className="text-xs text-muted-foreground">PIN: {usuario.pin_asignado}</p>
                           )}
@@ -729,7 +748,7 @@ const matchEstado = (() => {
 
                         <div className="hidden lg:block">
                           <p className="text-sm font-medium">
-                            {usuario.ocupado ? `$${usuario.costo_suscripcion?.toFixed(2)}` : "Disponible"}
+                            {usuario.ocupado ? `$${usuario.costo_suscripcion?.toFixed(2) || "0.00"}` : "Disponible"}
                           </p>
                           <p className="text-xs text-muted-foreground">{usuario.ocupado ? "Mensual" : "Sin asignar"}</p>
                         </div>

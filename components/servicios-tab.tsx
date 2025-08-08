@@ -20,9 +20,7 @@ import {
 import { useApp } from "@/contexts/app-context"
 import { supabase, type Servicio, type ServicioPin } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
-import { Plus, Edit, Trash2, Settings, Save } from 'lucide-react'
-import { Eye, EyeOff, User, UserCheck, Info, Copy, Check, Search, CalendarIcon, Mail, Lock, Key, ArrowUp, ArrowDown } from 'lucide-react'
-
+import { Plus, Edit, Trash2, Settings, Save, Copy } from 'lucide-react'
 
 export function ServiciosTab() {
   const { servicios, refreshServicios, refreshCuentas } = useApp()
@@ -450,41 +448,42 @@ export function ServiciosTab() {
                 const pinConfig = serviciosPines.find((p) => p.usuario_numero === usuarioNumero)
 
                 return (
-                  <Card key={usuarioNumero} className="p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Badge variant="outline">Perfil {usuarioNumero}</Badge>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <Label className="text-sm">PIN</Label>
-                        <Input
-                          value={pinConfig?.pin || ""}
-                          onChange={(e) => updatePinConfig(usuarioNumero, e.target.value, undefined)}
-                          placeholder="1234"
-                          maxLength={6}
-                          pattern="[0-9]*"
-                          inputMode="numeric"
-                        />
-                            <Button
-      type="button"
-      variant="outline"
-      size="icon"
-      onClick={() => navigator.clipboard.writeText(cuentaForm.email)}
-    >
-      <Copy className="h-4 w-4" />
-    </Button>
-                      </div>
-                      <div>
-                        <Label className="text-sm">Nombre del Perfil</Label>
-                        <Input 
-                          value={pinConfig?.nombre_usuario || `Usuario ${usuarioNumero}`}
-                          onChange={(e) => updatePinConfig(usuarioNumero, undefined, e.target.value)}
-                          placeholder={`Usuario ${usuarioNumero}`}
-                        />
-                      </div>
-                    </div>
-                  </Card>
+<Card key={usuarioNumero} className="p-4">
+  <div className="flex items-center gap-2 mb-3">
+    <Badge variant="outline">Perfil {usuarioNumero}</Badge>
+  </div>
+  <div className="grid grid-cols-2 gap-4">
+    <div>
+      <Label className="text-sm">PIN</Label>
+      <div className="flex items-center gap-2">
+        <Input
+          value={pinConfig?.pin || ""}
+          onChange={(e) => updatePinConfig(usuarioNumero, e.target.value, undefined)}
+          placeholder="1234"
+          maxLength={6}
+          pattern="[0-9]*"
+          inputMode="numeric"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={() => navigator.clipboard.writeText(pinConfig?.pin || "")}
+        >
+          <Copy className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+    <div>
+      <Label className="text-sm">Nombre del Perfil</Label>
+      <Input
+        value={pinConfig?.nombre_usuario || `Usuario ${usuarioNumero}`}
+        onChange={(e) => updatePinConfig(usuarioNumero, undefined, e.target.value)}
+        placeholder={`Usuario ${usuarioNumero}`}
+      />
+    </div>
+  </div>
+</Card>
                 )
               })}
 

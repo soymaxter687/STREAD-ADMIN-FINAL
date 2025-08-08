@@ -1449,33 +1449,52 @@ ${
               </div>
             </div>
 
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit_email" className="text-right">
-                Email
-              </Label>
-              <Input
-                id="edit_email"
-                type="email"
-                value={cuentaForm.email}
-                onChange={(e) => setCuentaForm({ ...cuentaForm, email: e.target.value })}
-                className="col-span-3"
-                required
-              />
-            </div>
+<div className="grid grid-cols-4 items-center gap-4">
+  <Label htmlFor="edit_email" className="text-right">
+    Correo
+  </Label>
+  <div className="col-span-3 flex items-center gap-2">
+    <Input
+      id="edit_email"
+      type="email"
+      value={cuentaForm.email}
+      onChange={(e) => setCuentaForm({ ...cuentaForm, email: e.target.value })}
+      required
+    />
+    <Button
+      type="button"
+      variant="outline"
+      size="icon"
+      onClick={() => navigator.clipboard.writeText(cuentaForm.email)}
+    >
+      <Copy className="h-4 w-4" />
+    </Button>
+  </div>
+</div>
 
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit_password" className="text-right">
-                Contraseña
-              </Label>
-              <Input
-                id="edit_password"
-                type="text"
-                value={cuentaForm.password}
-                onChange={(e) => setCuentaForm({ ...cuentaForm, password: e.target.value })}
-                className="col-span-3"
-                required
-              />
-            </div>
+<div className="grid grid-cols-4 items-center gap-4">
+  <Label htmlFor="edit_password" className="text-right">
+    Contraseña
+  </Label>
+  <div className="col-span-3 flex items-center gap-2">
+    <Input
+      id="edit_password"
+      type="text"
+      value={cuentaForm.password}
+      onChange={(e) => setCuentaForm({ ...cuentaForm, password: e.target.value })}
+      required
+    />
+    <Button
+      type="button"
+      variant="outline"
+      size="icon"
+      onClick={() => navigator.clipboard.writeText(cuentaForm.password)}
+    >
+      <Copy className="h-4 w-4" />
+    </Button>
+  </div>
+</div>
+
 
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="edit_vencimiento" className="text-right">

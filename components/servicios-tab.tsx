@@ -453,27 +453,31 @@ export function ServiciosTab() {
                       <Badge variant="outline">Perfil {usuarioNumero}</Badge>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <Label className="text-sm">PIN</Label>
-                        <Input
-                          value={pinConfig?.pin || ""}
-                          onChange={(e) => updatePinConfig(usuarioNumero, e.target.value, undefined)}
-                          placeholder="123456"
-                          maxLength={6}
-                          pattern="[0-9]*"
-                          inputMode="numeric"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-sm">Nombre del Perfil</Label>
-                        <Input 
-                          value={pinConfig?.nombre_usuario || `Usuario ${usuarioNumero}`}
-                          onChange={(e) => updatePinConfig(usuarioNumero, undefined, e.target.value)}
-                          placeholder={`Usuario ${usuarioNumero}`}
-                        />
-                      </div>
-                    </div>
+<div className="flex items-end gap-2">
+  <div className="flex-1">
+    <Label className="text-sm">PIN</Label>
+    <Input
+      value={pinConfig?.pin || ""}
+      onChange={(e) => updatePinConfig(usuarioNumero, e.target.value, undefined)}
+      placeholder="123456"
+      maxLength={6}
+      pattern="[0-9]*"
+      inputMode="numeric"
+      readOnly // evita que se modifique si solo quieres copiar
+    />
+  </div>
+  <Button
+    variant="outline"
+    size="sm"
+    onClick={() => {
+      if (pinConfig?.pin) {
+        navigator.clipboard.writeText(pinConfig.pin);
+      }
+    }}
+  >
+    Copiar
+  </Button>
+</div>
                   </Card>
                 )
               })}

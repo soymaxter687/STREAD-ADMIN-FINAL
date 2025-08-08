@@ -454,8 +454,8 @@ export function ServiciosTab() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-sm">PIN (solo números, máx. 6)</Label>
+                    <div>
+                        <Label className="text-sm">PIN</Label>
                         <Input
                           value={pinConfig?.pin || ""}
                           onChange={(e) => updatePinConfig(usuarioNumero, e.target.value, undefined)}

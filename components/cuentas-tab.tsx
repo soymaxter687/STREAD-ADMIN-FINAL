@@ -1164,29 +1164,52 @@ ${
               </CardHeader>
 
               <CardContent className="space-y-4">
-                {/* Credenciales */}
-                <div className="space-y-2">
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Email:</span>
-                    <p className="font-mono text-xs break-all">{cuenta.email}</p>
-                  </div>
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Contraseña:</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs">
-                        {mostrarPasswords[cuenta.id] ? cuenta.password : "••••••••"}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => togglePasswordVisibility(cuenta.id)}
-                        className="h-6 w-6 p-0"
-                      >
-                        {mostrarPasswords[cuenta.id] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+{/* Credenciales */}
+<div className="space-y-2">
+  {/* Correo */}
+  <div className="text-sm flex items-center gap-2">
+    <span className="text-muted-foreground">Correo:</span>
+    <p className="font-mono text-xs break-all">{cuenta.email}</p>
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="h-6 w-6 p-0"
+      onClick={() => navigator.clipboard.writeText(cuenta.email)}
+    >
+      <Copy className="h-3 w-3" />
+    </Button>
+  </div>
+
+  {/* Contraseña */}
+  <div className="text-sm flex items-center gap-2">
+    <span className="text-muted-foreground">Contraseña:</span>
+    <div className="flex items-center gap-2">
+      <span className="font-mono text-xs">
+        {mostrarPasswords[cuenta.id] ? cuenta.password : "••••••••"}
+      </span>
+      {/* Botón mostrar/ocultar */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => togglePasswordVisibility(cuenta.id)}
+        className="h-6 w-6 p-0"
+      >
+        {mostrarPasswords[cuenta.id] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+      </Button>
+      {/* Botón copiar contraseña */}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-6 w-6 p-0"
+        onClick={() => navigator.clipboard.writeText(cuenta.password)}
+      >
+        <Copy className="h-3 w-3" />
+      </Button>
+    </div>
+  </div>
+</div>
 
                 {/* Perfiles como íconos */}
                 <div className="space-y-2">

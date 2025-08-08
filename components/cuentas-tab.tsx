@@ -1452,7 +1452,7 @@ ${
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="privada">Privada (1 perfil)</SelectItem>
-                  <SelectItem value="privada">Estandar (4 perfiles)</SelectItem>
+                  <SelectItem value="estandar">Estandar (4 perfiles)</SelectItem>
                   <SelectItem value="compartida">Compartida (múltiples perfiles)</SelectItem>
                 </SelectContent>
               </Select>

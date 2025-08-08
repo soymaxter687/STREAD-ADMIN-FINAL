@@ -414,7 +414,9 @@ const exportToExcel = () => {
                 */}
 
                 <DialogFooter>
-                  <Button type="submit">{editingCliente ? "Actualizar" : "Crear"}</Button>
+                  <Button type="submit" disabled={nuevoCliente.codigo.length !== 4}>
+                    {editingCliente ? "Actualizar" : "Crear"}
+                  </Button>
                 </DialogFooter>
               </form>
             </DialogContent>

@@ -656,7 +656,7 @@ export function CuentasTab() {
 ${perfil.pin ? `🔑 PIN: ${perfil.pin}` : ""}
 ${
   asignacion?.fecha_vencimiento_usuario
-    ? `📅 Vence: ${(() => {
+    ? `📅 Próximo Pago: ${(() => {
         const [year, month, day] = asignacion.fecha_vencimiento_usuario.split("-")
         const date = new Date(Number.parseInt(year), Number.parseInt(month) - 1, Number.parseInt(day))
         return date.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })

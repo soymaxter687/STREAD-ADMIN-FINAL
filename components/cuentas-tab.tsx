@@ -657,13 +657,9 @@ ${perfil.pin ? `🔑 PIN: ${perfil.pin}` : ""}
 ${
   asignacion?.fecha_vencimiento_usuario
     ? `📅 Vence: ${(() => {
-const [year, month, day] = asignacion.fecha_vencimiento_usuario.split("-");
-const date = new Date(Date.UTC(
-  parseInt(year),
-  parseInt(month) - 1,
-  parseInt(day)
-));
-return date.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
+        const [year, month, day] = asignacion.fecha_vencimiento_usuario.split("-")
+        const date = new Date(Number.parseInt(year), Number.parseInt(month) - 1, Number.parseInt(day))
+        return date.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })
       })()}`
     : ""
 }
@@ -1664,11 +1660,11 @@ return date.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "
                               <p className="text-sm">
                                 {(() => {
                                   const [year, month, day] = asignacion.fecha_vencimiento_usuario.split("-")
-                                  const date = new Date(
-                                    Number.parseInt(year),
-                                    Number.parseInt(month) - 1,
-                                    Number.parseInt(day),
-                                  )
+const date = new Date(Date.UTC(
+  Number.parseInt(year),
+  Number.parseInt(month) - 1,
+  Number.parseInt(day)
+))
                                   return date.toLocaleDateString("es-ES", {
                                     day: "numeric",
                                     month: "long",

@@ -1142,7 +1142,7 @@ export default function Dashboard() {
                     <CardContent>
                       <h2 className="text-lg font-bold mb-4">Servicios más utilizados</h2>
 
-                      <div className="space-y-4 max-h-35 overflow-y-auto pr-2 custom-scroll">
+                      <div className="space-y-4 max-h-40 overflow-y-auto pr-2 custom-scroll">
                         {serviciosMasUtilizados.length > 0 ? (
                           serviciosMasUtilizados.map((servicio) => (
                             <div key={servicio.id} className="flex items-center justify-between">

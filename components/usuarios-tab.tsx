@@ -634,7 +634,7 @@ export function UsuariosTab() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Lista de Usuarios ({estadisticas.totalUsuarios})</CardTitle>
+              <CardTitle>Lista de Usuarios ({estadisticas.usuariosOcupados})</CardTitle>
               <CardDescription>Gestiona los perfiles de usuario de todas las cuentas</CardDescription>
             </div>
             <DropdownMenu>

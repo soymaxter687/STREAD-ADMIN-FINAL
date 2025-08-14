@@ -604,7 +604,7 @@ export default function Dashboard() {
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/5 rounded-full blur-2xl"></div>
 
           {/* Content */}
-          <div className="relative px-8 py-8">
+          <div className="relative px-4 py-8">
             {/* Top section with title and button */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center space-x-6">
@@ -1142,7 +1142,7 @@ export default function Dashboard() {
                     <CardContent>
                       <h2 className="text-lg font-bold mb-4">Servicios más utilizados</h2>
 
-                      <div className="space-y-4 max-h-40 overflow-y-auto pr-2 custom-scroll">
+                      <div className="space-y-4 max-h-[150px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                         {serviciosMasUtilizados.length > 0 ? (
                           serviciosMasUtilizados.map((servicio) => (
                             <div key={servicio.id} className="flex items-center justify-between">

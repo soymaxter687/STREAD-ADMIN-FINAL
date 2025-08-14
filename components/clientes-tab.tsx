@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -22,8 +21,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useApp } from "@/contexts/app-context"
 import { supabase, type Cliente } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
-import { Plus, Edit, Trash2, Search, Users } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import { Plus, Edit, Trash2, Search, Users } from "lucide-react"
+import * as XLSX from "xlsx"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 
 export function ClientesTab() {
   const { clientes, refreshClientes } = useApp()
@@ -32,9 +33,10 @@ export function ClientesTab() {
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedClientes, setSelectedClientes] = useState<number[]>([])
+  const [codigoError, setCodigoError] = useState("")
   const [nuevoCliente, setNuevoCliente] = useState({
     nombre: "",
-    telefono: "",
+    telefono: "+52",
     email: "",
     codigo: "",
     activo: true,
@@ -49,6 +51,7 @@ export function ClientesTab() {
       activo: true,
     })
     setEditingCliente(null)
+    setCodigoError("")
   }
 
   const handleInputChange = (field: string, value: string) => {
@@ -57,10 +60,24 @@ export function ClientesTab() {
     if (field === "nombre") {
       // Solo letras, espacios, acentos y ñ, convertir a mayúsculas
       processedValue = value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "").toUpperCase()
-    } 
-    else if (field === "codigo") {
+    } else if (field === "telefono") {
+      // Solo números y +, sin espacios, siempre empezar con +52
+      processedValue = value.replace(/[^\d+]/g, "")
+      if (!processedValue.startsWith("+52")) {
+        processedValue = "+52" + processedValue.replace(/^\+?52?/, "")
+      }
+    } else if (field === "codigo") {
       // Solo números, máximo 4 caracteres
       processedValue = value.replace(/\D/g, "").slice(0, 4)
+
+      // Validate codigo length
+      if (processedValue.length === 4) {
+        setCodigoError("")
+      } else if (processedValue.length > 0) {
+        setCodigoError("El código debe tener exactamente 4 dígitos")
+      } else {
+        setCodigoError("")
+      }
     }
 
     setNuevoCliente((prev) => ({
@@ -71,6 +88,12 @@ export function ClientesTab() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Validate codigo length
+    if (nuevoCliente.codigo.length !== 4) {
+      setCodigoError("El código debe tener exactamente 4 dígitos")
+      return
+    }
 
     try {
       const clienteData = {
@@ -102,9 +125,10 @@ export function ClientesTab() {
       }
 
       await refreshClientes()
-      
+
       setDialogOpen(false)
       resetForm()
+      setCodigoError("")
     } catch (error: any) {
       toast({
         title: "Error",
@@ -118,7 +142,7 @@ export function ClientesTab() {
     setEditingCliente(cliente)
     setNuevoCliente({
       nombre: cliente.nombre,
-      telefono: cliente.telefono,
+      telefono: cliente.telefono.startsWith("+52") ? cliente.telefono : "+52" + cliente.telefono,
       email: cliente.email,
       codigo: cliente.codigo || "",
       activo: cliente.activo,
@@ -126,42 +150,40 @@ export function ClientesTab() {
     setDialogOpen(true)
   }
 
-const checkClienteHasUsuarios = async (clienteId: number): Promise<boolean> => {
-  try {
-    // Try different possible column names that might reference the client
-    const possibleColumns = ['cliente_id', 'client_id', 'id_cliente']
-    
-    for (const columnName of possibleColumns) {
-      try {
-        const { data, error } = await supabase
-          .from("cuentas")
-          .select("id")
-          .eq(columnName, clienteId)
-          .limit(1)
+  const checkClienteHasUsuarios = async (clienteId: number): Promise<boolean> => {
+    try {
+      // Try different possible column names that might reference the client
+      const possibleColumns = ["cliente_id", "client_id", "id_cliente"]
 
-        if (!error && data && data.length > 0) {
-          return true
+      for (const columnName of possibleColumns) {
+        try {
+          const { data, error } = await supabase.from("cuentas").select("id").eq(columnName, clienteId).limit(1)
+
+          if (!error && data && data.length > 0) {
+            return true
+          }
+        } catch (columnError) {
+          // Continue to next column if this one doesn't exist
+          continue
         }
-      } catch (columnError) {
-        // Continue to next column if this one doesn't exist
-        continue
       }
+
+      return false
+    } catch (error) {
+      console.error("Error checking client users:", error)
+      return false
     }
-    
-    return false
-  } catch (error) {
-    console.error("Error checking client users:", error)
-    return false
   }
-}
 
   const handleDelete = async (id: number) => {
     try {
       // Check if client has assigned users
       const hasUsuarios = await checkClienteHasUsuarios(id)
-    
+
       if (hasUsuarios) {
-        alert("Este cliente tiene usuarios asignados en cuentas. Elimina primero los usuarios antes de eliminar el cliente.")
+        alert(
+          "Este cliente tiene usuarios asignados en cuentas. Elimina primero los usuarios antes de eliminar el cliente.",
+        )
         return
       }
 
@@ -177,7 +199,6 @@ const checkClienteHasUsuarios = async (clienteId: number): Promise<boolean> => {
       })
 
       await refreshClientes()
-      
     } catch (error: any) {
       toast({
         title: "Error",
@@ -196,18 +217,19 @@ const checkClienteHasUsuarios = async (clienteId: number): Promise<boolean> => {
       for (const clienteId of selectedClientes) {
         const hasUsuarios = await checkClienteHasUsuarios(clienteId)
         if (hasUsuarios) {
-          const cliente = clientes.find(c => c.id === clienteId)
+          const cliente = clientes.find((c) => c.id === clienteId)
           if (cliente) clientesConUsuarios.push(cliente.nombre)
         }
       }
 
       if (clientesConUsuarios.length > 0) {
-        alert(`Los siguientes clientes tienen usuarios asignados en cuentas: ${clientesConUsuarios.join(", ")}. Elimina primero los usuarios antes de eliminar estos clientes.`)
+        alert(
+          `Los siguientes clientes tienen usuarios asignados en cuentas: ${clientesConUsuarios.join(", ")}. Elimina primero los usuarios antes de eliminar estos clientes.`,
+        )
         return
       }
 
-      if (!confirm(`¿Estás seguro de que quieres eliminar estos ${selectedClientes.length} clientes?`))
-        return
+      if (!confirm(`¿Estás seguro de que quieres eliminar estos ${selectedClientes.length} clientes?`)) return
 
       const { error } = await supabase.from("clientes").delete().in("id", selectedClientes)
 
@@ -220,7 +242,6 @@ const checkClienteHasUsuarios = async (clienteId: number): Promise<boolean> => {
 
       setSelectedClientes([])
       await refreshClientes()
-      
     } catch (error: any) {
       toast({
         title: "Error",
@@ -246,54 +267,58 @@ const checkClienteHasUsuarios = async (clienteId: number): Promise<boolean> => {
     }
   }
 
-const exportToCSV = () => {
-  const csvData = filteredClientes.map(cliente => ({
-    Nombre: cliente.nombre,
-    Telefono: cliente.telefono,
-    'Correo electrónico': cliente.email,
-    Codigo: cliente.codigo || 'Sin código'
-  }))
+  const exportToCSV = () => {
+    const csvData = filteredClientes.map((cliente) => ({
+      Nombre: cliente.nombre,
+      Telefono: cliente.telefono,
+      "Correo electrónico": cliente.email,
+      Codigo: cliente.codigo || "Sin código",
+    }))
 
-  const csvContent = [
-    Object.keys(csvData[0]).join(','),
-    ...csvData.map(row => Object.values(row).map(value => `"${value}"`).join(','))
-  ].join('\n')
+    const csvContent = [
+      Object.keys(csvData[0]).join(","),
+      ...csvData.map((row) =>
+        Object.values(row)
+          .map((value) => `"${value}"`)
+          .join(","),
+      ),
+    ].join("\n")
 
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-  const link = document.createElement('a')
-  const url = URL.createObjectURL(blob)
-  link.setAttribute('href', url)
-  link.setAttribute('download', `clientes_${new Date().toISOString().split('T')[0]}.csv`)
-  link.style.visibility = 'hidden'
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-}
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `clientes_${new Date().toISOString().split("T")[0]}.csv`)
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
-const exportToExcel = () => {
-  const excelData = filteredClientes.map(cliente => ({
-    Nombre: cliente.nombre,
-    Telefono: cliente.telefono,
-    'Correo electrónico': cliente.email,
-    Codigo: cliente.codigo || 'Sin código'
-  }))
+  const exportToExcel = () => {
+    const excelData = filteredClientes.map((cliente) => ({
+      Nombre: cliente.nombre,
+      Telefono: cliente.telefono,
+      "Correo electrónico": cliente.email,
+      Codigo: cliente.codigo || "Sin código",
+    }))
 
-  const ws = XLSX.utils.json_to_sheet(excelData)
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, 'Clientes')
-  
-  // Use writeFileXLSX instead of writeFile for browser compatibility
-  const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
-  const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-  const link = document.createElement('a')
-  const url = URL.createObjectURL(blob)
-  link.setAttribute('href', url)
-  link.setAttribute('download', `clientes_${new Date().toISOString().split('T')[0]}.xlsx`)
-  link.style.visibility = 'hidden'
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-}
+    const ws = XLSX.utils.json_to_sheet(excelData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Clientes")
+
+    // Use writeFileXLSX instead of writeFile for browser compatibility
+    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" })
+    const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `clientes_${new Date().toISOString().split("T")[0]}.xlsx`)
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
   const filteredClientes = clientes.filter(
     (cliente) =>
@@ -383,16 +408,24 @@ const exportToExcel = () => {
                   <Label htmlFor="codigo" className="text-right">
                     Codigo*
                   </Label>
-                  <Input
-                    id="codigo"
-                    value={nuevoCliente.codigo}
-                    onChange={(e) => handleInputChange("codigo", e.target.value)}
-                    className="col-span-3"
-                    placeholder="1234"
-                    minLength={4}
-                    maxLength={4}
-                    required
-                  />
+                  <div className="col-span-3 space-y-2">
+                    <Input
+                      id="codigo"
+                      value={nuevoCliente.codigo}
+                      onChange={(e) => handleInputChange("codigo", e.target.value)}
+                      className={codigoError ? "border-red-500" : ""}
+                      placeholder="1234"
+                      maxLength={4}
+                      required
+                    />
+                    {codigoError && (
+                      <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{codigoError}</AlertDescription>
+                      </Alert>
+                    )}
+                    <p className="text-xs text-muted-foreground">Debe contener exactamente 4 dígitos</p>
+                  </div>
                 </div>
 
                 {/*CODIGO DE CLIENTE ACTIVO
@@ -410,7 +443,7 @@ const exportToExcel = () => {
                 */}
 
                 <DialogFooter>
-                  <Button type="submit" disabled={nuevoCliente.codigo.length !== 4}>
+                  <Button type="submit" disabled={!!codigoError || nuevoCliente.codigo.length !== 4}>
                     {editingCliente ? "Actualizar" : "Crear"}
                   </Button>
                 </DialogFooter>
@@ -436,84 +469,78 @@ const exportToExcel = () => {
                 className="w-64"
               />
             </div>
-          <div className="flex items-center gap-2 mt-4">
-            <Button
-              variant="outline"
-              onClick={exportToCSV}
-              className="flex items-center gap-2"
-            >
-              Descargar CSV
-            </Button>
-            <Button
-              variant="outline"
-              onClick={exportToExcel}
-              className="flex items-center gap-2"
-            >
-              Descargar Excel
-            </Button>
-          </div>
+            <div className="flex items-center gap-2 mt-4">
+              <Button variant="outline" onClick={exportToCSV} className="flex items-center gap-2 bg-transparent">
+                Descargar CSV
+              </Button>
+              <Button variant="outline" onClick={exportToExcel} className="flex items-center gap-2 bg-transparent">
+                Descargar Excel
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
           {filteredClientes.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={allSelected}
-                      onCheckedChange={handleSelectAll}
-                      ref={(el) => {
-                        if (el) el.indeterminate = someSelected
-                      }}
-                    />
-                  </TableHead>
-                  <TableHead className="text-lg">Nombre</TableHead>
-                  <TableHead className="text-lg">Telefono</TableHead>
-                  <TableHead className="text-lg">Correo electrónico</TableHead>
-                  <TableHead className="text-lg">Codigo</TableHead>
-                  {/*<TableHead>Estado</TableHead>*/}
-                  <TableHead>Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredClientes.map((cliente) => (
-                  <TableRow key={cliente.id}>
-                    <TableCell>
+            <div className="max-h-[600px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">
                       <Checkbox
-                        checked={selectedClientes.includes(cliente.id)}
-                        onCheckedChange={(checked) => handleSelectCliente(cliente.id, checked as boolean)}
+                        checked={allSelected}
+                        onCheckedChange={handleSelectAll}
+                        ref={(el) => {
+                          if (el) el.indeterminate = someSelected
+                        }}
                       />
-                    </TableCell>
-                    <TableCell className="font-medium">{cliente.nombre}</TableCell>
-                    <TableCell>{cliente.telefono}</TableCell>
-                    <TableCell>{cliente.email}</TableCell>
-                    <TableCell>
-                      {cliente.codigo ? (
-                        <Badge variant="outline">{cliente.codigo}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">Sin código</span>
-                      )}
-                    </TableCell>
-                    {/*<TableCell>
-                      <Badge variant={cliente.activo ? "default" : "secondary"}>
-                        {cliente.activo ? "Activo" : "Inactivo"}
-                      </Badge>
-                    </TableCell>*/}
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(cliente)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(cliente.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    </TableHead>
+                    <TableHead className="text-lg">Nombre</TableHead>
+                    <TableHead className="text-lg">Telefono</TableHead>
+                    <TableHead className="text-lg">Correo electrónico</TableHead>
+                    <TableHead className="text-lg">Codigo</TableHead>
+                    {/*<TableHead>Estado</TableHead>*/}
+                    <TableHead>Acciones</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredClientes.map((cliente) => (
+                    <TableRow key={cliente.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedClientes.includes(cliente.id)}
+                          onCheckedChange={(checked) => handleSelectCliente(cliente.id, checked as boolean)}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">{cliente.nombre}</TableCell>
+                      <TableCell>{cliente.telefono}</TableCell>
+                      <TableCell>{cliente.email}</TableCell>
+                      <TableCell>
+                        {cliente.codigo ? (
+                          <Badge variant="outline">{cliente.codigo}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">Sin código</span>
+                        )}
+                      </TableCell>
+                      {/*<TableCell>
+                        <Badge variant={cliente.activo ? "default" : "secondary"}>
+                          {cliente.activo ? "Activo" : "Inactivo"}
+                        </Badge>
+                      </TableCell>*/}
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleEdit(cliente)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(cliente.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-12">
               <Users className="h-12 w-12 text-muted-foreground mb-4" />

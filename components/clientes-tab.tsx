@@ -311,7 +311,7 @@ const exportToExcel = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Gestión de Clientes</h2>
-          <p className="text-muted-foreground">Administra la información de tus clientes</p>
+          <p className="text-white">Administra la información de tus clientes</p>
         </div>
 
         <div className="flex gap-2">

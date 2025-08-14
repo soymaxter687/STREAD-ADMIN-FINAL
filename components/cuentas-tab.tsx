@@ -1311,7 +1311,7 @@ ${
                   <div className="text-sm">
                     <span className="text-muted-foreground">Correo:</span>
                     <div className="flex items-center gap-2">
-                      <p className="text-sm break-all flex-1">{cuenta.email}</p>
+                      <p className="text-sm break-all">{cuenta.email}</p>
                       <Button
                         variant="ghost"
                         size="sm"

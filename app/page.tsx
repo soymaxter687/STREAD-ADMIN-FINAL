@@ -1,22 +1,28 @@
 "use client"
 
+import { TabsContent } from "@/components/ui/tabs"
+
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
+import { useApp } from "@/contexts/app-context"
+import { Users, CreditCard, Activity, Target, RefreshCw } from "lucide-react"
+import { supabase } from "@/lib/supabase"
+import { useToast } from "@/hooks/use-toast"
+import { formatearNombreCuenta } from "@/lib/utils"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useApp } from "@/contexts/app-context"
 import { ServiciosTab } from "@/components/servicios-tab"
 import { CuentasTab } from "@/components/cuentas-tab"
 import { ClientesTab } from "@/components/clientes-tab"
 import { UsuariosTab } from "@/components/usuarios-tab"
 import { ControlFinanciero } from "@/components/control-financiero"
-import { Users, CreditCard, DollarSign, TrendingUp, Plus, Activity, Target, RefreshCw } from 'lucide-react'
+import { DollarSign, TrendingUp, Plus } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -26,13 +32,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { supabase } from "@/lib/supabase"
-import { useToast } from "@/hooks/use-toast"
-import { formatearNombreCuenta } from "@/lib/utils"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle } from 'lucide-react'
-import { Eye, EyeOff, Trash2, Edit, User, UserCheck, Info, Copy, Check, Search, CalendarIcon, Mail, Lock, Key, ArrowUp, ArrowDown } from 'lucide-react'
-
+import { AlertCircle } from "lucide-react"
 
 export default function Dashboard() {
   const {
@@ -45,6 +46,7 @@ export default function Dashboard() {
     refreshData,
     loading,
     getEstadisticas,
+    cuentaUsuarios,
   } = useApp()
   const { toast } = useToast()
 
@@ -52,6 +54,7 @@ export default function Dashboard() {
   const [clienteDialogOpen, setClienteDialogOpen] = useState(false)
   const [cuentaDialogOpen, setCuentaDialogOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [syncingSheets, setSyncingSheets] = useState(false)
   const [clienteForm, setClienteForm] = useState({
     nombre: "",
     telefono: "+52",
@@ -66,10 +69,36 @@ export default function Dashboard() {
     fecha_vencimiento: "",
     precio_base: "",
     precio_cliente: "",
-    tipo_cuenta: "compartida", // privada o compartida
+    tipo_cuenta: "compartida",
     activa: true,
   })
   const [numeroError, setNumeroError] = useState("")
+  const [codigoError, setCodigoError] = useState("")
+
+  // Función para obtener fecha en zona horaria de Campeche, México
+  const getFechaCampeche = (date?: Date) => {
+    const fechaBase = date || new Date()
+    // Campeche, México está en UTC-6 (CST)
+    const fechaCampeche = new Date(fechaBase.toLocaleString("en-US", { timeZone: "America/Merida" }))
+    return fechaCampeche
+  }
+
+  // Función para formatear fecha como YYYY-MM-DD en zona horaria de Campeche
+  const formatearFechaCampeche = (date: Date) => {
+    const fechaCampeche = getFechaCampeche(date)
+    const year = fechaCampeche.getFullYear()
+    const month = String(fechaCampeche.getMonth() + 1).padStart(2, "0")
+    const day = String(fechaCampeche.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+  }
+
+  // Función para obtener fecha un mes después en zona horaria de Campeche
+  const getFechaUnMesDespues = () => {
+    const hoy = getFechaCampeche()
+    const unMesDespues = new Date(hoy)
+    unMesDespues.setMonth(unMesDespues.getMonth() + 1)
+    return formatearFechaCampeche(unMesDespues)
+  }
 
   // Refrescar datos cuando cambie de pestaña
   useEffect(() => {
@@ -79,80 +108,157 @@ export default function Dashboard() {
   const handleRefresh = async () => {
     setRefreshing(true)
     await refreshData()
+
+    // Also sync with Google Sheets after refreshing local data
+    await handleSyncGoogleSheets()
+
     setRefreshing(false)
   }
 
-  // Calcular estadísticas del dashboard
-  const estadisticas = getEstadisticas()
+  const handleSyncGoogleSheets = async () => {
+    setSyncingSheets(true)
 
-  // Calcular servicios más utilizados (ordenados por usuarios asignados)
-  const serviciosMasUtilizados = servicios
-    .filter((s) => s.activo)
-    .map((servicio) => {
-      const usuariosDelServicio = asignaciones.filter(
-        (a) => a.cuenta_usuario?.cuenta?.servicio_id === servicio.id,
-      ).length
+    try {
+      console.log("Iniciando sincronización con Google Sheets...")
 
-      return {
-        ...servicio,
-        usuariosAsignados: usuariosDelServicio,
+      // Obtener datos completos de usuarios
+      const usuariosCompletos = cuentaUsuarios
+        .map((usuario) => {
+          const cuenta = cuentas.find((c) => c.id === usuario.cuenta_id)
+          const servicio = servicios.find((s) => s.id === usuario.servicio_id)
+          const asignacion = asignaciones?.find((a) => a.cuenta_usuario_id === usuario.id && a.activa)
+          const cliente = asignacion ? clientes?.find((c) => c.id === asignacion.cliente_id) : null
+
+          return {
+            ...usuario,
+            cuenta,
+            servicio,
+            asignacion,
+            cliente,
+            fecha_vencimiento_usuario: asignacion?.fecha_vencimiento_usuario,
+            nombre_perfil: asignacion?.nombre_perfil || `Usuario ${usuario.usuario_numero}`,
+            pin_asignado: asignacion?.pin_asignado || usuario.pin,
+            costo_suscripcion: asignacion?.costo_suscripcion,
+            ocupado: usuario.ocupado,
+          }
+        })
+        .filter((usuario) => usuario.cuenta && usuario.servicio && usuario.cuenta.activa)
+
+      // Formatear datos para Google Sheets
+      const sheetsData = usuariosCompletos.map((usuario) => ({
+        Nombre: usuario.cliente?.nombre || "Usuario Libre",
+        Telefono: usuario.cliente?.telefono || "",
+        "Correo Cuenta": usuario.cuenta?.email || "",
+        Contraseña: usuario.cuenta?.password || "",
+        Servicio: usuario.servicio?.nombre || "",
+        Usuario: usuario.nombre_perfil || "",
+        "Fecha Vencimiento": usuario.fecha_vencimiento_usuario
+          ? new Date(usuario.fecha_vencimiento_usuario + "T00:00:00").toLocaleDateString("es-MX")
+          : "",
+        PIN: usuario.pin_asignado || "",
+        Codigo: usuario.cliente?.codigo || "",
+        Precio: usuario.ocupado ? `$${usuario.costo_suscripcion?.toFixed(2) || "0.00"}` : "$0.00",
+        "Correo Cliente": usuario.cliente?.email || "",
+      }))
+
+      console.log("Datos a enviar:", sheetsData)
+      console.log("Total de registros:", sheetsData.length)
+
+      // Crear la URL con los parámetros
+      const baseUrl =
+        "https://script.google.com/macros/s/AKfycbxU0Q2nWtZITl2OScZCD1vNhAlFJqyFC4qbpC8oqm3oinsqTYplkJdm32IB5I1qGLiO/exec"
+      const params = new URLSearchParams()
+      params.append("action", "updateSheet")
+      params.append("data", JSON.stringify(sheetsData))
+
+      const fullUrl = `${baseUrl}?${params.toString()}`
+
+      console.log("URL construida:", fullUrl.substring(0, 200) + "...")
+
+      // Método 1: Usar fetch con modo cors
+      try {
+        const response = await fetch(fullUrl, {
+          method: "GET",
+          mode: "cors",
+          headers: {
+            Accept: "text/plain",
+          },
+        })
+
+        if (response.ok) {
+          const result = await response.text()
+          console.log("Respuesta del servidor:", result)
+
+          toast({
+            title: "✅ Sincronización exitosa",
+            description: `Lista actualizada en Google Sheets (${sheetsData.length} registros)`,
+          })
+          setSyncingSheets(false)
+          return
+        }
+      } catch (fetchError) {
+        console.log("Fetch falló, intentando con iframe...", fetchError)
       }
-    })
-    .sort((a, b) => b.usuariosAsignados - a.usuariosAsignados)
 
-  // Función para obtener el próximo número disponible
-  const getProximoNumeroDisponible = (servicioId: number) => {
-    const cuentasDelServicio = cuentas.filter((c) => c.servicio_id === servicioId)
-    const numerosUsados = cuentasDelServicio
-      .map((c) => {
-        const partes = c.nombre.split("-")
-        return Number.parseInt(partes[1]) || 1
+      // Método 2: Fallback con iframe si fetch falla
+      const iframe = document.createElement("iframe")
+      iframe.style.display = "none"
+      iframe.style.width = "1px"
+      iframe.style.height = "1px"
+      document.body.appendChild(iframe)
+
+      let timeoutId: NodeJS.Timeout
+
+      const cleanup = () => {
+        if (timeoutId) clearTimeout(timeoutId)
+        if (iframe.parentNode) {
+          document.body.removeChild(iframe)
+        }
+      }
+
+      // Configurar timeout
+      timeoutId = setTimeout(() => {
+        cleanup()
+        toast({
+          title: "✅ Sincronización completada",
+          description: `Datos enviados a Google Sheets (${sheetsData.length} registros)`,
+        })
+        setSyncingSheets(false)
+      }, 5000) // 5 segundos
+
+      // Configurar eventos del iframe
+      iframe.onload = () => {
+        console.log("Iframe cargado exitosamente")
+        cleanup()
+        toast({
+          title: "✅ Sincronización exitosa",
+          description: `Lista actualizada en Google Sheets (${sheetsData.length} registros)`,
+        })
+        setSyncingSheets(false)
+      }
+
+      iframe.onerror = () => {
+        console.error("Error en iframe")
+        cleanup()
+        toast({
+          title: "⚠️ Sincronización completada",
+          description: `Datos enviados (${sheetsData.length} registros). Verifica Google Sheets.`,
+        })
+        setSyncingSheets(false)
+      }
+
+      // Iniciar la carga del iframe
+      console.log("Cargando iframe...")
+      iframe.src = fullUrl
+    } catch (error: any) {
+      console.error("Error en sincronización:", error)
+      toast({
+        title: "❌ Error de sincronización",
+        description: `Error: ${error.message}`,
+        variant: "destructive",
       })
-      .sort((a, b) => a - b)
-
-    // Encontrar el primer número disponible empezando desde 1
-    for (let i = 1; i <= numerosUsados.length + 1; i++) {
-      if (!numerosUsados.includes(i)) {
-        return i.toString()
-      }
+      setSyncingSheets(false)
     }
-    return "1"
-  }
-
-  // Función para verificar si un número ya existe
-  const verificarNumeroExiste = (servicioId: number, numero: string) => {
-    const servicio = servicios.find((s) => s.id === servicioId)
-    if (!servicio) return false
-
-    const nombreFormateado = formatearNombreCuenta(servicio.nombre)
-    const nombreCompleto = `${nombreFormateado.toUpperCase()}-${numero}`
-
-    return cuentas.some((c) => c.nombre === nombreCompleto && c.servicio_id === servicioId)
-  }
-
-  // Función para validar número en tiempo real
-  const validarNumero = (servicioId: string, numero: string) => {
-    if (!servicioId || !numero) {
-      setNumeroError("")
-      return true
-    }
-
-    const id = Number.parseInt(servicioId)
-    const servicio = servicios.find((s) => s.id === id)
-
-    if (!servicio) {
-      setNumeroError("")
-      return true
-    }
-
-    if (verificarNumeroExiste(id, numero)) {
-      const nombreFormateado = formatearNombreCuenta(servicio.nombre)
-      setNumeroError(`La cuenta ${nombreFormateado.toUpperCase()}-${numero} ya existe`)
-      return false
-    }
-
-    setNumeroError("")
-    return true
   }
 
   const resetCuentaForm = () => {
@@ -197,7 +303,10 @@ export default function Dashboard() {
       }
 
       // Generar contraseña recomendada basada en el nombre del servicio + 6 números aleatorios
-      const nombreServicio = servicio.nombre.toLowerCase().split(' ')[0].replace(/[^a-z0-9]/g, '')
+      const nombreServicio = servicio.nombre
+        .toLowerCase()
+        .split(" ")[0]
+        .replace(/[^a-z0-9]/g, "")
       const numerosAleatorios = Math.floor(100000 + Math.random() * 900000) // Genera 6 dígitos
       const passwordRecomendada = `${nombreServicio}${numerosAleatorios}`
 
@@ -213,7 +322,7 @@ export default function Dashboard() {
 
   const handleNumeroChange = (numero: string) => {
     setCuentaForm((prev) => ({ ...prev, numero_cuenta: numero }))
-  
+
     // Validar el número
     validarNumero(cuentaForm.servicio_id, numero)
 
@@ -231,9 +340,12 @@ export default function Dashboard() {
             setCuentaForm((prev) => ({ ...prev, email: emailRecomendado }))
           }
         }
-        
+
         // Regenerar contraseña
-        const nombreServicio = servicio.nombre.toLowerCase().split(' ')[0].replace(/[^a-z0-9]/g, '')
+        const nombreServicio = servicio.nombre
+          .toLowerCase()
+          .split(" ")[0]
+          .replace(/[^a-z0-9]/g, "")
         const numerosAleatorios = Math.floor(100000 + Math.random() * 900000)
         const passwordRecomendada = `${nombreServicio}${numerosAleatorios}`
         setCuentaForm((prev) => ({ ...prev, password: passwordRecomendada }))
@@ -254,6 +366,12 @@ export default function Dashboard() {
   const handleClienteSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    // Validate codigo length
+    if (clienteForm.codigo.length !== 4) {
+      setCodigoError("El código debe tener exactamente 4 dígitos")
+      return
+    }
+
     try {
       const { error } = await supabase.from("clientes").insert([clienteForm])
 
@@ -265,6 +383,7 @@ export default function Dashboard() {
       })
 
       setClienteForm({ nombre: "", telefono: "+52", email: "", codigo: "" })
+      setCodigoError("")
       setClienteDialogOpen(false)
       await refreshClientes()
     } catch (error: any) {
@@ -325,6 +444,7 @@ export default function Dashboard() {
           Number.parseFloat(cuentaForm.precio_cliente) ||
           Number.parseFloat(cuentaForm.precio_base) * 1.2 ||
           servicio.precio_mensual * 1.2,
+        tipo_cuenta: cuentaForm.tipo_cuenta,
         activa: cuentaForm.activa,
       }
 
@@ -338,13 +458,15 @@ export default function Dashboard() {
       if (errorCuenta) throw errorCuenta
 
       // Limpiar cualquier usuario existente (por seguridad)
-      await supabase
-        .from("cuenta_usuarios")
-        .delete()
-        .eq("cuenta_id", cuentaCreada.id)
+      await supabase.from("cuenta_usuarios").delete().eq("cuenta_id", cuentaCreada.id)
 
       // Crear usuarios según el tipo de cuenta
-      const cantidadUsuarios = cuentaForm.tipo_cuenta === "privada" ? 1 : servicio.usuarios_por_cuenta || 4
+      const cantidadUsuarios =
+        cuentaForm.tipo_cuenta === "privada"
+          ? 1
+          : cuentaForm.tipo_cuenta === "estandar"
+            ? 4
+            : servicio.usuarios_por_cuenta || 4
       const usuariosData = []
 
       for (let i = 1; i <= cantidadUsuarios; i++) {
@@ -359,9 +481,7 @@ export default function Dashboard() {
       }
 
       // Insertar usuarios con manejo de errores mejorado
-      const { error: errorUsuarios } = await supabase
-        .from("cuenta_usuarios")
-        .insert(usuariosData)
+      const { error: errorUsuarios } = await supabase.from("cuenta_usuarios").insert(usuariosData)
 
       if (errorUsuarios) {
         console.error("Error al crear usuarios:", errorUsuarios)
@@ -388,6 +508,76 @@ export default function Dashboard() {
     }
   }
 
+  const getProximoNumeroDisponible = (servicioId: number) => {
+    const cuentasDelServicio = cuentas.filter((c) => c.servicio_id === servicioId)
+    const numerosUsados = cuentasDelServicio
+      .map((c) => {
+        const partes = c.nombre.split("-")
+        return Number.parseInt(partes[1]) || 1
+      })
+      .sort((a, b) => a - b)
+
+    // Encontrar el primer número disponible empezando desde 1
+    for (let i = 1; i <= numerosUsados.length + 1; i++) {
+      if (!numerosUsados.includes(i)) {
+        return i.toString()
+      }
+    }
+    return "1"
+  }
+
+  // Función para verificar si un número ya existe
+  const verificarNumeroExiste = (servicioId: number, numero: string) => {
+    const servicio = servicios.find((s) => s.id === servicioId)
+    if (!servicio) return false
+
+    const nombreFormateado = formatearNombreCuenta(servicio.nombre)
+    const nombreCompleto = `${nombreFormateado.toUpperCase()}-${numero}`
+
+    return cuentas.some((c) => c.nombre === nombreCompleto && c.servicio_id === servicioId)
+  }
+
+  // Función para validar número en tiempo real
+  const validarNumero = (servicioId: string, numero: string) => {
+    if (!servicioId || !numero) {
+      setNumeroError("")
+      return true
+    }
+
+    const id = Number.parseInt(servicioId)
+    const servicio = servicios.find((s) => s.id === id)
+
+    if (!servicio) {
+      setNumeroError("")
+      return true
+    }
+
+    if (verificarNumeroExiste(id, numero)) {
+      const nombreFormateado = formatearNombreCuenta(servicio.nombre)
+      setNumeroError(`La cuenta ${nombreFormateado.toUpperCase()}-${numero} ya existe`)
+      return false
+    }
+
+    setNumeroError("")
+    return true
+  }
+
+  const estadisticas = getEstadisticas()
+
+  const serviciosMasUtilizados = servicios
+    .filter((s) => s.activo)
+    .map((servicio) => {
+      const usuariosDelServicio = asignaciones.filter(
+        (a) => a.cuenta_usuario?.cuenta?.servicio_id === servicio.id,
+      ).length
+
+      return {
+        ...servicio,
+        usuariosAsignados: usuariosDelServicio,
+      }
+    })
+    .sort((a, b) => b.usuariosAsignados - a.usuariosAsignados)
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -402,498 +592,602 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-bold">StreamAdmin</h1>
-            <p className="text-muted-foreground">Sistema de Gestión de Servicios Digitales</p>
-          </div>
-          <Button onClick={handleRefresh} disabled={refreshing} variant="outline">
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-            Actualizar
-          </Button>
-        </div>
+        {/* Enhanced Header with Integrated Tabs */}
+        <div className="relative mb-8">
+          {/* Background with animated gradient */}
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 rounded-3xl opacity-90"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/10 to-transparent rounded-3xl"></div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5 h-12 bg-yellow-200">
-            <TabsTrigger value="dashboard" className="hover:bg-yellow-100 text-lg text-green-600 font-bold">Inicio</TabsTrigger>
-            <TabsTrigger value="cuentas" className="hover:bg-yellow-100 text-lg text-green-600 font-bold">Cuentas</TabsTrigger>
-            <TabsTrigger value="usuarios" className="hover:bg-yellow-100 text-lg text-green-600 font-bold">Usuarios</TabsTrigger>
-            <TabsTrigger value="clientes" className="hover:bg-yellow-100 text-lg text-green-600 font-bold">Clientes</TabsTrigger>
-            {/*<TabsTrigger value="financiero">Financiero</TabsTrigger>*/}
-            <TabsTrigger value="servicios" className="hover:bg-yellow-100 text-lg text-green-600 font-bold">Servicios</TabsTrigger>
-          </TabsList>
+          {/* Decorative elements */}
+          <div className="absolute top-4 left-4 w-20 h-20 bg-white/10 rounded-full blur-xl"></div>
+          <div className="absolute bottom-4 right-4 w-16 h-16 bg-yellow-300/20 rounded-full blur-lg"></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/5 rounded-full blur-2xl"></div>
 
-          <TabsContent value="dashboard" className="space-y-4">
-            {/* Estadísticas principales */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Servicios Activos</CardTitle>
-                  <Activity className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{servicios.filter((s) => s.activo).length}</div>
-                  <p className="text-xs text-muted-foreground">Plataformas disponibles</p>
-                </CardContent>
-              </Card>
+          {/* Content */}
+          <div className="relative px-8 py-8">
+            {/* Top section with title and button */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-6">
+                {/* Logo/Icon with animation */}
+                <div className="relative">
+                  <div className="w-16 h-16 bg-gradient-to-br from-white/30 to-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/30 shadow-2xl transform hover:scale-110 transition-all duration-300">
+                    <div className="text-3xl animate-bounce">🎬</div>
+                  </div>
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white animate-pulse"></div>
+                </div>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Cuentas Activas</CardTitle>
-                  <CreditCard className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{estadisticas.totalCuentas}</div>
-                  <p className="text-xs text-muted-foreground">Cuentas configuradas</p>
-                </CardContent>
-              </Card>
+                {/* Title and subtitle with enhanced styling */}
+                <div className="space-y-1">
+                  <h1 className="text-4xl font-black text-white tracking-tight bg-gradient-to-r from-white via-yellow-200 to-white bg-clip-text text-transparent drop-shadow-2xl">
+                    Stream<span className="text-yellow-300">Admin</span>
+                  </h1>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-ping"></div>
+                    <p className="text-blue-100 text-lg font-semibold tracking-wide">
+                      Sistema de Gestión de Servicios Digitales
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Clientes Activos</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{estadisticas.totalClientes}</div>
-                  <p className="text-xs text-muted-foreground">Clientes registrados</p>
-                </CardContent>
-              </Card>
+              {/* Action button with enhanced styling */}
+              <div className="flex flex-col items-end space-y-2">
+                <Button
+                  onClick={handleRefresh}
+                  disabled={refreshing || syncingSheets}
+                  className="bg-gradient-to-r from-white/20 to-white/10 backdrop-blur-sm border border-white/30 text-white hover:from-white/30 hover:to-white/20 transition-all duration-300 shadow-2xl hover:shadow-3xl transform hover:scale-105 hover:-translate-y-1"
+                  size="lg"
+                >
+                  <RefreshCw className={`h-5 w-5 mr-3 ${refreshing || syncingSheets ? "animate-spin" : ""}`} />
+                  {syncingSheets ? "Sincronizando..." : refreshing ? "Actualizando..." : "Actualizar"}
+                </Button>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Usuarios Asignados</CardTitle>
-                  <Target className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{estadisticas.usuariosOcupados}</div>
-                  <p className="text-xs text-muted-foreground">Perfiles vendidos</p>
-                </CardContent>
-              </Card>
+                {/* Status indicators */}
+                <div className="flex items-center space-x-2 text-white/80 text-sm">
+                  <div className="flex items-center space-x-1">
+                    <Users className="h-4 w-4" />
+                    <span>{estadisticas.totalClientes}</span>
+                  </div>
+                  <div className="w-1 h-1 bg-white/50 rounded-full"></div>
+                  <div className="flex items-center space-x-1">
+                    <CreditCard className="h-4 w-4" />
+                    <span>{estadisticas.totalCuentas}</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Resumen financiero */}
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-green-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">${estadisticas.ingresosMensuales.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">{estadisticas.usuariosOcupados} perfiles vendidos</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Gastos Totales</CardTitle>
-                  <DollarSign className="h-4 w-4 text-red-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-red-600">
-                    $
-                    {cuentas
-                      .filter((c) => c.activa)
-                      .reduce((total, cuenta) => total + (cuenta.precio_base || cuenta.precio_mensual), 0)
-                      .toFixed(2)}
+            {/* Integrated Tabs */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+              <TabsList className="relative grid w-full grid-cols-5 h-14 bg-white/10 backdrop-blur-sm rounded-2xl p-2 shadow-xl border border-white/20">
+                <TabsTrigger
+                  value="dashboard"
+                  className="relative overflow-hidden rounded-xl hover:bg-white/20 text-white font-bold transition-all duration-300 hover:shadow-lg hover:scale-105 data-[state=active]:bg-gradient-to-r data-[state=active]:from-yellow-400 data-[state=active]:to-yellow-500 data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=active]:scale-105 group"
+                >
+                  <div className="flex items-center space-x-2 relative z-10">
+                    <Activity className="h-4 w-4 group-hover:animate-pulse" />
+                    <span className="text-sm font-black tracking-wide">Inicio</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">{estadisticas.totalCuentas} cuentas activas</p>
-                </CardContent>
-              </Card>
+                </TabsTrigger>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Utilidad</CardTitle>
-                  <TrendingUp
-                    className={`h-4 w-4 ${(estadisticas.ingresosMensuales - cuentas.filter((c) => c.activa).reduce((total, cuenta) => total + (cuenta.precio_base || cuenta.precio_mensual), 0)) >= 0 ? "text-green-600" : "text-red-600"}`}
-                  />
-                </CardHeader>
-                <CardContent>
-                  <div
-                    className={`text-2xl font-bold ${(estadisticas.ingresosMensuales - cuentas.filter((c) => c.activa).reduce((total, cuenta) => total + (cuenta.precio_base || cuenta.precio_mensual), 0)) >= 0 ? "text-green-600" : "text-red-600"}`}
-                  >
-                    $
-                    {(
-                      estadisticas.ingresosMensuales -
-                      cuentas
-                        .filter((c) => c.activa)
-                        .reduce((total, cuenta) => total + (cuenta.precio_base || cuenta.precio_mensual), 0)
-                    ).toFixed(2)}
+                <TabsTrigger
+                  value="cuentas"
+                  className="relative overflow-hidden rounded-xl hover:bg-white/20 text-white font-bold transition-all duration-300 hover:shadow-lg hover:scale-105 data-[state=active]:bg-gradient-to-r data-[state=active]:from-yellow-400 data-[state=active]:to-yellow-500 data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=active]:scale-105 group"
+                >
+                  <div className="flex items-center space-x-2 relative z-10">
+                    <CreditCard className="h-4 w-4 group-hover:animate-pulse" />
+                    <span className="text-sm font-black tracking-wide">Cuentas</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">Ganancia neta mensual</p>
-                </CardContent>
-              </Card>
-            </div>
+                </TabsTrigger>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              {/* Acciones rápidas */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Acciones Rápidas</CardTitle>
-                  <CardDescription>Accede rápidamente a las funciones más utilizadas</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {/* Agregar Cliente */}
-                    <Dialog open={clienteDialogOpen} onOpenChange={setClienteDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button className="w-full justify-start bg-transparent" variant="outline">
-                          <Users className="h-4 w-4 mr-2" />
-                          Agregar Nuevo Cliente
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Nuevo Cliente</DialogTitle>
-                          <DialogDescription>Agrega un nuevo cliente al sistema</DialogDescription>
-                        </DialogHeader>
-                        <form onSubmit={handleClienteSubmit} className="space-y-4">
-  <div className="grid grid-cols-4 items-center gap-4">
-    <Label htmlFor="nombre" className="text-right">
-      Nombre*
-    </Label>
-    <Input
-      id="nombre"
-      value={clienteForm.nombre}
-      onChange={(e) => {
-        const valor = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "").toUpperCase();
-        setClienteForm({ ...clienteForm, nombre: valor });
-      }}
-      className="col-span-3"
-      placeholder="JORGE PEREZ"
-      required
-    />
-  </div>
+                <TabsTrigger
+                  value="usuarios"
+                  className="relative overflow-hidden rounded-xl hover:bg-white/20 text-white font-bold transition-all duration-300 hover:shadow-lg hover:scale-105 data-[state=active]:bg-gradient-to-r data-[state=active]:from-yellow-400 data-[state=active]:to-yellow-500 data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=active]:scale-105 group"
+                >
+                  <div className="flex items-center space-x-2 relative z-10">
+                    <Users className="h-4 w-4 group-hover:animate-pulse" />
+                    <span className="text-sm font-black tracking-wide">Usuarios</span>
+                  </div>
+                </TabsTrigger>
 
-  <div className="grid grid-cols-4 items-center gap-4">
-    <Label htmlFor="telefono" className="text-right">
-      Telefono*
-    </Label>
-<Input
-  id="telefono"
-  value={clienteForm.telefono}
-  onChange={(e) => {
-    const valor = e.target.value.replace(/[^\d+]/g, "");
-    setClienteForm({ ...clienteForm, telefono: valor });
-  }}
-  className="col-span-3"
-  required
-/>
-  </div>
+                <TabsTrigger
+                  value="clientes"
+                  className="relative overflow-hidden rounded-xl hover:bg-white/20 text-white font-bold transition-all duration-300 hover:shadow-lg hover:scale-105 data-[state=active]:bg-gradient-to-r data-[state=active]:from-yellow-400 data-[state=active]:to-yellow-500 data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=active]:scale-105 group"
+                >
+                  <div className="flex items-center space-x-2 relative z-10">
+                    <Target className="h-4 w-4 group-hover:animate-pulse" />
+                    <span className="text-sm font-black tracking-wide">Clientes</span>
+                  </div>
+                </TabsTrigger>
 
-  <div className="grid grid-cols-4 items-center gap-4">
-    <Label htmlFor="email" className="text-right">
-      Correo
-    </Label>
-    <Input
-      id="email"
-      type="email"
-      value={clienteForm.email}
-      onChange={(e) => setClienteForm({ ...clienteForm, email: e.target.value })}
-      className="col-span-3"
-      placeholder="ejemplo@gmail.com"
-    />
-  </div>
+                <TabsTrigger
+                  value="servicios"
+                  className="relative overflow-hidden rounded-xl hover:bg-white/20 text-white font-bold transition-all duration-300 hover:shadow-lg hover:scale-105 data-[state=active]:bg-gradient-to-r data-[state=active]:from-yellow-400 data-[state=active]:to-yellow-500 data-[state=active]:text-black data-[state=active]:shadow-lg data-[state=active]:scale-105 group"
+                >
+                  <div className="flex items-center space-x-2 relative z-10">
+                    <div className="text-lg group-hover:animate-bounce">⚙️</div>
+                    <span className="text-sm font-black tracking-wide">Servicios</span>
+                  </div>
+                </TabsTrigger>
+              </TabsList>
 
-  <div className="grid grid-cols-4 items-center gap-4">
-    <Label htmlFor="codigo" className="text-right">
-      Codigo*
-    </Label>
-    <Input
-      id="codigo"
-      value={clienteForm.codigo}
-      onChange={(e) => {
-        const valor = e.target.value.replace(/\D/g, "").slice(0, 4);
-        setClienteForm({ ...clienteForm, codigo: valor });
-      }}
-      className="col-span-3"
-      placeholder="1234"
-      minLength={4}
-      maxLength={4}
-      required
-    />
-  </div>
+              <TabsContent value="dashboard" className="space-y-4">
+                {/* Estadísticas principales */}
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Servicios Activos</CardTitle>
+                      <Activity className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{servicios.filter((s) => s.activo).length}</div>
+                      <p className="text-xs text-muted-foreground">Plataformas disponibles</p>
+                    </CardContent>
+                  </Card>
 
-  <DialogFooter>
-    <Button type="submit">Agregar Cliente</Button>
-  </DialogFooter>
-</form>
-                      </DialogContent>
-                    </Dialog>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Cuentas Activas</CardTitle>
+                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{estadisticas.totalCuentas}</div>
+                      <p className="text-xs text-muted-foreground">Cuentas configuradas</p>
+                    </CardContent>
+                  </Card>
 
-                    {/* Crear Cuenta */}
-                    <Dialog open={cuentaDialogOpen} onOpenChange={setCuentaDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button
-                          className="w-full justify-start bg-transparent"
-                          variant="outline"
-                          onClick={resetCuentaForm}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Crear Nueva Cuenta
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[500px]">
-                        <DialogHeader>
-                          <DialogTitle>Nueva Cuenta</DialogTitle>
-                          <DialogDescription>Agrega una nueva cuenta de servicio</DialogDescription>
-                        </DialogHeader>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Clientes Activos</CardTitle>
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{estadisticas.totalClientes}</div>
+                      <p className="text-xs text-muted-foreground">Clientes registrados</p>
+                    </CardContent>
+                  </Card>
 
-                        <form onSubmit={handleCuentaSubmit} className="space-y-4">
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="servicio" className="text-right">
-                              Servicio
-                            </Label>
-                            <Select value={cuentaForm.servicio_id} onValueChange={handleServicioChange} required>
-                              <SelectTrigger className="col-span-3">
-                                <SelectValue placeholder="Selecciona un servicio" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {servicios
-                                  .filter((s) => s.activo)
-                                  .map((servicio) => (
-                                    <SelectItem key={servicio.id} value={servicio.id.toString()}>
-                                      {servicio.emoji} {servicio.nombre}
-                                    </SelectItem>
-                                  ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Usuarios Asignados</CardTitle>
+                      <Target className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{estadisticas.usuariosOcupados}</div>
+                      <p className="text-xs text-muted-foreground">Perfiles vendidos</p>
+                    </CardContent>
+                  </Card>
+                </div>
 
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="tipo_cuenta" className="text-right">
-                              Tipo
-                            </Label>
-                            <Select
-                              value={cuentaForm.tipo_cuenta}
-                              onValueChange={(value) => setCuentaForm({ ...cuentaForm, tipo_cuenta: value })}
-                            >
-                              <SelectTrigger className="col-span-3">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="privada">Privada (1 perfil)</SelectItem>
-                                <SelectItem value="compartida">Compartida (múltiples perfiles)</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                {/* Resumen financiero */}
+                <div className="grid gap-4 md:grid-cols-3">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-green-600">
+                        ${estadisticas.ingresosMensuales.toFixed(2)}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{estadisticas.usuariosOcupados} perfiles vendidos</p>
+                    </CardContent>
+                  </Card>
 
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="numero_cuenta" className="text-right">
-                              Número
-                            </Label>
-                            <div className="col-span-3 space-y-2">
-                              <Input
-                                id="numero_cuenta"
-                                type="number"
-                                min="1"
-                                value={cuentaForm.numero_cuenta}
-                                onChange={(e) => handleNumeroChange(e.target.value)}
-                                className={numeroError ? "border-red-500" : ""}
-                                placeholder="1"
-                                required
-                              />
-                              {numeroError && (
-                                <Alert variant="destructive">
-                                  <AlertCircle className="h-4 w-4" />
-                                  <AlertDescription>{numeroError}</AlertDescription>
-                                </Alert>
-                              )}
-                              <p className="text-xs text-muted-foreground">
-                                Se sugiere automáticamente el primer número disponible
-                              </p>
-                            </div>
-                          </div>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Gastos Totales</CardTitle>
+                      <DollarSign className="h-4 w-4 text-red-600" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-red-600">
+                        $
+                        {cuentas
+                          .filter((c) => c.activa)
+                          .reduce((total, cuenta) => total + (cuenta.precio_base || cuenta.precio_mensual), 0)
+                          .toFixed(2)}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{estadisticas.totalCuentas} cuentas activas</p>
+                    </CardContent>
+                  </Card>
 
-<div className="grid grid-cols-4 items-center gap-4">
-  <Label htmlFor="email" className="text-right">
-    Correo
-  </Label>
-  <div className="col-span-3 flex items-center gap-2">
-    <Input
-      id="email"
-      type="email"
-      value={cuentaForm.email}
-      onChange={(e) => setCuentaForm({ ...cuentaForm, email: e.target.value })}
-      required
-    />
-    <Button
-      type="button"
-      variant="outline"
-      size="icon"
-      onClick={() => navigator.clipboard.writeText(cuentaForm.email)}
-    >
-      <Copy className="h-4 w-4" />
-    </Button>
-  </div>
-</div>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Utilidad</CardTitle>
+                      <TrendingUp
+                        className={`h-4 w-4 ${(estadisticas.ingresosMensuales - cuentas.filter((c) => c.activa).reduce((total, cuenta) => total + (cuenta.precio_base || cuenta.precio_mensual), 0)) >= 0 ? "text-green-600" : "text-red-600"}`}
+                      />
+                    </CardHeader>
+                    <CardContent>
+                      <div
+                        className={`text-2xl font-bold ${(estadisticas.ingresosMensuales - cuentas.filter((c) => c.activa).reduce((total, cuenta) => total + (cuenta.precio_base || cuenta.precio_mensual), 0)) >= 0 ? "text-green-600" : "text-red-600"}`}
+                      >
+                        $
+                        {(
+                          estadisticas.ingresosMensuales -
+                          cuentas
+                            .filter((c) => c.activa)
+                            .reduce((total, cuenta) => total + (cuenta.precio_base || cuenta.precio_mensual), 0)
+                        ).toFixed(2)}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Ganancia neta mensual</p>
+                    </CardContent>
+                  </Card>
+                </div>
 
-<div className="grid grid-cols-4 items-center gap-4">
-  <Label htmlFor="password" className="text-right">
-    Contraseña
-  </Label>
-  <div className="col-span-3 flex items-center gap-2">
-    <Input
-      id="password"
-      type="text"
-      value={cuentaForm.password}
-      onChange={(e) => setCuentaForm({ ...cuentaForm, password: e.target.value })}
-      required
-    />
-    <Button
-      type="button"
-      variant="outline"
-      size="icon"
-      onClick={() => navigator.clipboard.writeText(cuentaForm.password)}
-    >
-      <Copy className="h-4 w-4" />
-    </Button>
-  </div>
-</div>
-
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="vencimiento" className="text-right">
-                              Vencimiento
-                            </Label>
-                            <Input
-                              id="vencimiento"
-                              type="date"
-                              value={cuentaForm.fecha_vencimiento}
-                              onChange={(e) => setCuentaForm({ ...cuentaForm, fecha_vencimiento: e.target.value })}
-                              className="col-span-3"
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label htmlFor="precio_base">Costo ($)</Label>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => adjustPrice("precio_base", false)}
-                                  className="px-2"
-                                >
-                                  -
-                                </Button>
-                                <Input
-                                  id="precio_base"
-                                  type="number"
-                                  step="1"
-                                  value={cuentaForm.precio_base}
-                                  onChange={(e) => setCuentaForm({ ...cuentaForm, precio_base: e.target.value })}
-                                  className="text-center"
-                                  required
-                                />
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => adjustPrice("precio_base", true)}
-                                  className="px-2"
-                                >
-                                  +
-                                </Button>
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1">Costo de la cuenta (inversión)</p>
-                            </div>
-                            <div>
-                              <Label htmlFor="precio_cliente">Precio Cliente ($)</Label>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => adjustPrice("precio_cliente", false)}
-                                  className="px-2"
-                                >
-                                  -
-                                </Button>
-                                <Input
-                                  id="precio_cliente"
-                                  type="number"
-                                  step="1"
-                                  value={cuentaForm.precio_cliente}
-                                  onChange={(e) => setCuentaForm({ ...cuentaForm, precio_cliente: e.target.value })}
-                                  className="text-center"
-                                  required
-                                />
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => adjustPrice("precio_cliente", true)}
-                                  className="px-2"
-                                >
-                                  +
-                                </Button>
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1">Precio de venta por perfil</p>
-                            </div>
-                          </div>
-
-                          <DialogFooter>
-                            <Button type="submit" disabled={!!numeroError}>
-                              Crear Cuenta
+                <div className="grid gap-4 md:grid-cols-2">
+                  {/* Acciones rápidas */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Acciones Rápidas</CardTitle>
+                      <CardDescription>Accede rápidamente a las funciones más utilizadas</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {/* Agregar Cliente */}
+                        <Dialog open={clienteDialogOpen} onOpenChange={setClienteDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button className="w-full justify-start bg-transparent" variant="outline">
+                              <Users className="h-4 w-4 mr-2" />
+                              Agregar Nuevo Cliente
                             </Button>
-                          </DialogFooter>
-                        </form>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                </CardContent>
-              </Card>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Nuevo Cliente</DialogTitle>
+                              <DialogDescription>Agrega un nuevo cliente al sistema</DialogDescription>
+                            </DialogHeader>
+                            <form onSubmit={handleClienteSubmit} className="space-y-4">
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="nombre" className="text-right">
+                                  Nombre*
+                                </Label>
+                                <Input
+                                  id="nombre"
+                                  value={clienteForm.nombre}
+                                  onChange={(e) => {
+                                    const valor = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "").toUpperCase()
+                                    setClienteForm({ ...clienteForm, nombre: valor })
+                                  }}
+                                  className="col-span-3"
+                                  placeholder="JORGE PEREZ"
+                                  required
+                                />
+                              </div>
 
-<Card className="border rounded-2xl shadow-md">
-  <CardContent>
-    <h2 className="text-lg font-bold mb-4">Servicios más utilizados</h2>
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="telefono" className="text-right">
+                                  Telefono*
+                                </Label>
+                                <Input
+                                  id="telefono"
+                                  value={clienteForm.telefono}
+                                  onChange={(e) => {
+                                    let valor = e.target.value.replace(/[^\d+]/g, "")
+                                    if (!valor.startsWith("+52")) {
+                                      valor = "+52" + valor.replace(/^\+?52?/, "")
+                                    }
+                                    setClienteForm({ ...clienteForm, telefono: valor })
+                                  }}
+                                  className="col-span-3"
+                                  required
+                                />
+                              </div>
 
-    <div className="space-y-4 max-h-45 overflow-y-auto pr-2 custom-scroll">
-      {serviciosMasUtilizados.length > 0 ? (
-        serviciosMasUtilizados.map((servicio) => (
-          <div key={servicio.id} className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">{servicio.emoji}</span>
-              <p className="font-medium">{servicio.nombre}</p>
-            </div>
-            <Badge variant={servicio.usuariosAsignados > 0 ? "default" : "secondary"}>
-              {servicio.usuariosAsignados} usuarios
-            </Badge>
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="email" className="text-right">
+                                  Correo
+                                </Label>
+                                <Input
+                                  id="email"
+                                  type="email"
+                                  value={clienteForm.email}
+                                  onChange={(e) => setClienteForm({ ...clienteForm, email: e.target.value })}
+                                  className="col-span-3"
+                                  placeholder="ejemplo@gmail.com"
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="codigo" className="text-right">
+                                  Código*
+                                </Label>
+                                <div className="col-span-3 space-y-2">
+                                  <Input
+                                    id="codigo"
+                                    value={clienteForm.codigo}
+                                    onChange={(e) => {
+                                      const valor = e.target.value.replace(/\D/g, "").slice(0, 4)
+                                      setClienteForm({ ...clienteForm, codigo: valor })
+                                      if (valor.length === 4) {
+                                        setCodigoError("")
+                                      } else if (valor.length > 0) {
+                                        setCodigoError("El código debe tener exactamente 4 dígitos")
+                                      } else {
+                                        setCodigoError("")
+                                      }
+                                    }}
+                                    className={`col-span-3 ${codigoError ? "border-red-500" : ""}`}
+                                    placeholder="1234"
+                                    maxLength={4}
+                                    required
+                                  />
+                                  {codigoError && (
+                                    <Alert variant="destructive">
+                                      <AlertCircle className="h-4 w-4" />
+                                      <AlertDescription>{codigoError}</AlertDescription>
+                                    </Alert>
+                                  )}
+                                  <p className="text-xs text-muted-foreground">Debe contener exactamente 4 dígitos</p>
+                                </div>
+                              </div>
+
+                              <DialogFooter>
+                                <Button type="submit" disabled={!!codigoError || clienteForm.codigo.length !== 4}>
+                                  Agregar Cliente
+                                </Button>
+                              </DialogFooter>
+                            </form>
+                          </DialogContent>
+                        </Dialog>
+
+                        {/* Crear Cuenta */}
+                        <Dialog open={cuentaDialogOpen} onOpenChange={setCuentaDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button
+                              className="w-full justify-start bg-transparent"
+                              variant="outline"
+                              onClick={resetCuentaForm}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Crear Nueva Cuenta
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-[500px]">
+                            <DialogHeader>
+                              <DialogTitle>Nueva Cuenta</DialogTitle>
+                              <DialogDescription>Agrega una nueva cuenta de servicio</DialogDescription>
+                            </DialogHeader>
+
+                            <form onSubmit={handleCuentaSubmit} className="space-y-4">
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="servicio" className="text-right">
+                                  Servicio
+                                </Label>
+                                <Select value={cuentaForm.servicio_id} onValueChange={handleServicioChange} required>
+                                  <SelectTrigger className="col-span-3">
+                                    <SelectValue placeholder="Selecciona un servicio" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {servicios
+                                      .filter((s) => s.activo)
+                                      .map((servicio) => (
+                                        <SelectItem key={servicio.id} value={servicio.id.toString()}>
+                                          {servicio.emoji} {servicio.nombre}
+                                        </SelectItem>
+                                      ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="tipo_cuenta" className="text-right">
+                                  Tipo
+                                </Label>
+                                <Select
+                                  value={cuentaForm.tipo_cuenta}
+                                  onValueChange={(value) => setCuentaForm({ ...cuentaForm, tipo_cuenta: value })}
+                                >
+                                  <SelectTrigger className="col-span-3">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="privada">Privada (1 perfil)</SelectItem>
+                                    <SelectItem value="estandar">Estándar (4 perfiles)</SelectItem>
+                                    <SelectItem value="compartida">Compartida (múltiples perfiles)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="numero_cuenta" className="text-right">
+                                  Número
+                                </Label>
+                                <div className="col-span-3 space-y-2">
+                                  <Input
+                                    id="numero_cuenta"
+                                    type="number"
+                                    min="1"
+                                    value={cuentaForm.numero_cuenta}
+                                    onChange={(e) => handleNumeroChange(e.target.value)}
+                                    className={numeroError ? "border-red-500" : ""}
+                                    placeholder="1"
+                                    required
+                                  />
+                                  {numeroError && (
+                                    <Alert variant="destructive">
+                                      <AlertCircle className="h-4 w-4" />
+                                      <AlertDescription>{numeroError}</AlertDescription>
+                                    </Alert>
+                                  )}
+                                  <p className="text-xs text-muted-foreground">
+                                    Se sugiere automáticamente el primer número disponible
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="email" className="text-right">
+                                  Email
+                                </Label>
+                                <Input
+                                  id="email"
+                                  type="email"
+                                  value={cuentaForm.email}
+                                  onChange={(e) => setCuentaForm({ ...cuentaForm, email: e.target.value })}
+                                  className="col-span-3"
+                                  required
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="password" className="text-right">
+                                  Contraseña
+                                </Label>
+                                <Input
+                                  id="password"
+                                  type="text"
+                                  value={cuentaForm.password}
+                                  onChange={(e) => setCuentaForm({ ...cuentaForm, password: e.target.value })}
+                                  className="col-span-3"
+                                  required
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="vencimiento" className="text-right">
+                                  Vencimiento
+                                </Label>
+                                <Input
+                                  id="vencimiento"
+                                  type="date"
+                                  value={cuentaForm.fecha_vencimiento}
+                                  onChange={(e) => setCuentaForm({ ...cuentaForm, fecha_vencimiento: e.target.value })}
+                                  className="col-span-3"
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label htmlFor="precio_base">Costo ($)</Label>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => adjustPrice("precio_base", false)}
+                                      className="px-2"
+                                    >
+                                      -
+                                    </Button>
+                                    <Input
+                                      id="precio_base"
+                                      type="number"
+                                      step="1"
+                                      value={cuentaForm.precio_base}
+                                      onChange={(e) => setCuentaForm({ ...cuentaForm, precio_base: e.target.value })}
+                                      className="text-center"
+                                      required
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => adjustPrice("precio_base", true)}
+                                      className="px-2"
+                                    >
+                                      +
+                                    </Button>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-1">Costo de la cuenta (inversión)</p>
+                                </div>
+                                <div>
+                                  <Label htmlFor="precio_cliente">Precio Cliente ($)</Label>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => adjustPrice("precio_cliente", false)}
+                                      className="px-2"
+                                    >
+                                      -
+                                    </Button>
+                                    <Input
+                                      id="precio_cliente"
+                                      type="number"
+                                      step="1"
+                                      value={cuentaForm.precio_cliente}
+                                      onChange={(e) => setCuentaForm({ ...cuentaForm, precio_cliente: e.target.value })}
+                                      className="text-center"
+                                      required
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => adjustPrice("precio_cliente", true)}
+                                      className="px-2"
+                                    >
+                                      +
+                                    </Button>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-1">Precio de venta por perfil</p>
+                                </div>
+                              </div>
+
+                              <DialogFooter>
+                                <Button type="submit" disabled={!!numeroError}>
+                                  Crear Cuenta
+                                </Button>
+                              </DialogFooter>
+                            </form>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border rounded-2xl shadow-md">
+                    <CardContent>
+                      <h2 className="text-lg font-bold mb-4">Servicios más utilizados</h2>
+
+                      <div className="space-y-4 max-h-45 overflow-y-auto pr-2 custom-scroll">
+                        {serviciosMasUtilizados.length > 0 ? (
+                          serviciosMasUtilizados.map((servicio) => (
+                            <div key={servicio.id} className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <span className="text-2xl">{servicio.emoji}</span>
+                                <p className="font-medium">{servicio.nombre}</p>
+                              </div>
+                              <Badge variant={servicio.usuariosAsignados > 0 ? "default" : "secondary"}>
+                                {servicio.usuariosAsignados} usuarios
+                              </Badge>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-4">
+                            <p className="text-muted-foreground">No hay servicios configurados</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="servicios">
+                <ServiciosTab />
+              </TabsContent>
+
+              <TabsContent value="cuentas">
+                <CuentasTab />
+              </TabsContent>
+
+              <TabsContent value="clientes">
+                <ClientesTab />
+              </TabsContent>
+
+              <TabsContent value="usuarios">
+                <UsuariosTab />
+              </TabsContent>
+
+              <TabsContent value="financiero">
+                <ControlFinanciero />
+              </TabsContent>
+            </Tabs>
           </div>
-        ))
-      ) : (
-        <div className="text-center py-4">
-          <p className="text-muted-foreground">No hay servicios configurados</p>
         </div>
-      )}
-    </div>
-  </CardContent>
-</Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="servicios">
-            <ServiciosTab />
-          </TabsContent>
-
-          <TabsContent value="cuentas">
-            <CuentasTab />
-          </TabsContent>
-
-          <TabsContent value="clientes">
-            <ClientesTab />
-          </TabsContent>
-
-          <TabsContent value="usuarios">
-            <UsuariosTab />
-          </TabsContent>
-
-          <TabsContent value="financiero">
-            <ControlFinanciero />
-          </TabsContent>
-        </Tabs>
       </div>
     </div>
   )

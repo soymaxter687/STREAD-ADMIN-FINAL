@@ -17,8 +17,8 @@ import {
 import { useApp } from "@/contexts/app-context"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
-import { Users, UserCheck, UserX, DollarSign, Search, ArrowUpDown, Edit, Trash2, Phone } from 'lucide-react'
-import { Download, FileSpreadsheet, FileText } from 'lucide-react'
+import { Users, Search, ArrowUpDown, Edit, Trash2, Phone } from "lucide-react"
+import { Download, FileSpreadsheet, FileText } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 export function UsuariosTab() {
@@ -53,20 +53,35 @@ export function UsuariosTab() {
     costo_personalizado: "",
   })
 
+  // Función para obtener fecha en zona horaria de Campeche, México
+  const getFechaCampeche = (date?: Date) => {
+    const fechaBase = date || new Date()
+    // Campeche, México está en UTC-6 (CST)
+    const fechaCampeche = new Date(fechaBase.toLocaleString("en-US", { timeZone: "America/Merida" }))
+    return fechaCampeche
+  }
+
+  // Función para formatear fecha como YYYY-MM-DD en zona horaria de Campeche
+  const formatearFechaCampeche = (date: Date) => {
+    const fechaCampeche = getFechaCampeche(date)
+    const year = fechaCampeche.getFullYear()
+    const month = String(fechaCampeche.getMonth() + 1).padStart(2, "0")
+    const day = String(fechaCampeche.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+  }
+
+  // Función para obtener fecha un mes después en zona horaria de Campeche
+  const getFechaUnMesDespues = () => {
+    const hoy = getFechaCampeche()
+    const unMesDespues = new Date(hoy)
+    unMesDespues.setMonth(unMesDespues.getMonth() + 1)
+    return formatearFechaCampeche(unMesDespues)
+  }
+
   const resetAsignacionForm = () => {
-    // Crear fecha por defecto (un mes después) sin problemas de timezone
-    const fechaDefault = new Date()
-    fechaDefault.setMonth(fechaDefault.getMonth() + 1)
-
-    // Formatear la fecha como YYYY-MM-DD sin conversión de timezone
-    const year = fechaDefault.getFullYear()
-    const month = String(fechaDefault.getMonth() + 1).padStart(2, "0")
-    const day = String(fechaDefault.getDate()).padStart(2, "0")
-    const fechaFormateada = `${year}-${month}-${day}`
-
     setAsignacionForm({
       cliente_id: "",
-      fecha_vencimiento: fechaFormateada,
+      fecha_vencimiento: getFechaUnMesDespues(),
       costo_personalizado: "",
     })
     setClienteBusqueda("")
@@ -114,7 +129,7 @@ export function UsuariosTab() {
       const servicioNombre = usuario.servicio?.nombre || ""
       const cuentaNombre = usuario.cuenta?.nombre || ""
       const nombrePerfil = usuario.nombre_perfil || ""
-      
+
       const matchBusqueda =
         !busqueda ||
         clienteNombre.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -128,7 +143,7 @@ export function UsuariosTab() {
       const matchGrupo = filtroGrupo === "todos" || usuario.cuenta?.id.toString() === filtroGrupo
 
       const matchEstado = (() => {
-        const hoy = new Date()
+        const hoy = getFechaCampeche()
         const vencimiento = usuario.fecha_vencimiento_usuario
           ? new Date(usuario.fecha_vencimiento_usuario + "T00:00:00")
           : null
@@ -161,7 +176,7 @@ export function UsuariosTab() {
       if (ordenVencimiento !== "none") {
         const fechaA = a.fecha_vencimiento_usuario ? new Date(a.fecha_vencimiento_usuario + "T00:00:00").getTime() : 0
         const fechaB = b.fecha_vencimiento_usuario ? new Date(b.fecha_vencimiento_usuario + "T00:00:00").getTime() : 0
-        
+
         if (ordenVencimiento === "asc") {
           if (fechaA !== fechaB) return fechaA - fechaB
         } else {
@@ -199,7 +214,16 @@ export function UsuariosTab() {
       }
     })
     return filtered || []
-  }, [usuariosCompletos, busqueda, filtroServicio, filtroEstado, ordenAlfabetico, ordenAsignados, filtroGrupo, ordenVencimiento])
+  }, [
+    usuariosCompletos,
+    busqueda,
+    filtroServicio,
+    filtroEstado,
+    ordenAlfabetico,
+    ordenAsignados,
+    filtroGrupo,
+    ordenVencimiento,
+  ])
 
   useEffect(() => {
     setFiltroGrupo("todos")
@@ -207,14 +231,14 @@ export function UsuariosTab() {
 
   const clientesFiltrados = useMemo(() => {
     if (!clientes) return []
-    
+
     return clientes
       .filter((c) => c.activo)
       .filter((c) => {
         const nombre = c.nombre || ""
         const telefono = c.telefono || ""
         const busquedaLower = clienteBusqueda.toLowerCase()
-        
+
         return nombre.toLowerCase().includes(busquedaLower) || telefono.includes(clienteBusqueda)
       })
   }, [clientes, clienteBusqueda])
@@ -269,11 +293,7 @@ export function UsuariosTab() {
     if (!perfilSeleccionado || !asignacionForm.cliente_id) return
 
     try {
-      const hoy = new Date()
-      const year = hoy.getFullYear()
-      const month = String(hoy.getMonth() + 1).padStart(2, "0")
-      const day = String(hoy.getDate()).padStart(2, "0")
-      const fechaHoy = `${year}-${month}-${day}`
+      const fechaHoy = formatearFechaCampeche(new Date())
 
       const costo = asignacionForm.costo_personalizado
         ? Number.parseFloat(asignacionForm.costo_personalizado)
@@ -303,7 +323,7 @@ export function UsuariosTab() {
 
       await refreshUsuarios()
       await refreshAsignaciones()
-      
+
       setAsignacionDialogOpen(false)
       setPerfilSeleccionado(null)
     } catch (error: any) {
@@ -339,7 +359,7 @@ export function UsuariosTab() {
 
       await refreshUsuarios()
       await refreshAsignaciones()
-      
+
       setEditDialogOpen(false)
       setAsignacionEditando(null)
       setPerfilSeleccionado(null)
@@ -377,7 +397,7 @@ export function UsuariosTab() {
   const getEstadoVencimiento = (fechaVencimiento?: string) => {
     if (!fechaVencimiento) return { estado: "sin_fecha", dias: 0, color: "text-muted-foreground" }
 
-    const hoy = new Date()
+    const hoy = getFechaCampeche()
     const vencimiento = new Date(fechaVencimiento + "T00:00:00")
     const diffTime = vencimiento.getTime() - hoy.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
@@ -431,7 +451,7 @@ export function UsuariosTab() {
           : "",
         usuario.pin_asignado || "",
         usuario.cliente?.codigo || "",
-        usuario.ocupado ? `$${usuario.costo_suscripcion?.toFixed(2)}` : "$0.00",
+        usuario.ocupado ? `$${usuario.costo_suscripcion?.toFixed(2) || "0.00"}` : "$0.00",
         usuario.cliente?.email || "",
       ]
     })
@@ -518,7 +538,7 @@ export function UsuariosTab() {
     if (!usuario.ocupado) return "libre"
     if (!usuario.fecha_vencimiento_usuario) return "activo"
 
-    const hoy = new Date()
+    const hoy = getFechaCampeche()
     const vencimiento = new Date(usuario.fecha_vencimiento_usuario + "T00:00:00")
     const diffTime = vencimiento.getTime() - hoy.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
@@ -561,7 +581,7 @@ export function UsuariosTab() {
   return (
     <div className="space-y-6">
       {/* Estadísticas */}
-      
+
       {/*<div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -614,7 +634,7 @@ export function UsuariosTab() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Lista de Usuarios ({estadisticas.usuariosOcupados})</CardTitle>
+              <CardTitle>Lista de Usuarios ({estadisticas.totalUsuarios})</CardTitle>
               <CardDescription>Gestiona los perfiles de usuario de todas las cuentas</CardDescription>
             </div>
             <DropdownMenu>
@@ -682,7 +702,9 @@ export function UsuariosTab() {
               <SelectContent className="max-h-48 overflow-y-auto">
                 <SelectItem value="todos">Todos los grupos</SelectItem>
                 {cuentas
-                  .filter((c) => c.activa && (filtroServicio === "todos" || c.servicio_id?.toString() === filtroServicio))
+                  .filter(
+                    (c) => c.activa && (filtroServicio === "todos" || c.servicio_id?.toString() === filtroServicio),
+                  )
                   .map((cuenta) => (
                     <SelectItem key={cuenta.id} value={cuenta.id.toString()}>
                       {cuenta.nombre}
@@ -706,13 +728,14 @@ export function UsuariosTab() {
           </div>
 
           {/* Lista de usuarios */}
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
             {usuariosFiltrados.length > 0 ? (
               usuariosFiltrados.map((usuario) => {
                 const estado = getEstadoUsuario(usuario)
                 const diasRestantes = usuario.fecha_vencimiento_usuario
                   ? Math.ceil(
-                      (new Date(usuario.fecha_vencimiento_usuario + "T00:00:00").getTime() - new Date().getTime()) /
+                      (new Date(usuario.fecha_vencimiento_usuario + "T00:00:00").getTime() -
+                        getFechaCampeche().getTime()) /
                         (1000 * 60 * 60 * 24),
                     )
                   : null
@@ -783,7 +806,7 @@ export function UsuariosTab() {
                             <p className="text-xs text-muted-foreground mt-1">
                               {diasRestantes !== null &&
                                 (diasRestantes > 0
-                                  ? `${diasRestantes+1} días`
+                                  ? `${diasRestantes + 1} días`
                                   : diasRestantes === 0
                                     ? "Vence hoy"
                                     : `Vencido hace ${Math.abs(diasRestantes)} días`)}
@@ -925,7 +948,9 @@ export function UsuariosTab() {
                 value={asignacionForm.fecha_vencimiento}
                 onChange={(e) => setAsignacionForm({ ...asignacionForm, fecha_vencimiento: e.target.value })}
               />
-              <p className="text-xs text-muted-foreground mt-1">Por defecto se establece un mes después de hoy</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Por defecto se establece un mes después de hoy (zona horaria de Campeche)
+              </p>
             </div>
 
             <div>

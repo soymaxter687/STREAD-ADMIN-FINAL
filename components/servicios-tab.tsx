@@ -324,7 +324,7 @@ export function ServiciosTab() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Servicios Digitales</h2>
-          <p className="text-muted-foreground">Gestiona los servicios de streaming y configura perfiles con PINs</p>
+          <p className="text-white">Gestiona los servicios de streaming y configura perfiles con PINs</p>
         </div>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

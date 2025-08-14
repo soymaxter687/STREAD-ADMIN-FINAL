@@ -21,7 +21,28 @@ import { useApp } from "@/contexts/app-context"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { formatearNombreCuenta } from "@/lib/utils"
-import { Plus, Eye, EyeOff, DollarSign, Users, Trash2, Edit, User, UserCheck, Info, Copy, Check, Search, CalendarIcon, Mail, Lock, Key, AlertCircle, ArrowUp, ArrowDown } from 'lucide-react'
+import {
+  Plus,
+  Eye,
+  EyeOff,
+  DollarSign,
+  Users,
+  Trash2,
+  Edit,
+  User,
+  UserCheck,
+  Info,
+  Copy,
+  Check,
+  Search,
+  CalendarIcon,
+  Mail,
+  Lock,
+  Key,
+  AlertCircle,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -51,7 +72,7 @@ export function CuentasTab() {
   const [clienteBusqueda, setClienteBusqueda] = useState("")
   const [copiedItems, setCopiedItems] = useState<{ [key: string]: boolean }>({})
   const [numeroError, setNumeroError] = useState("")
-  const [ordenVencimiento, setOrdenVencimiento] = useState<'asc' | 'desc'>('asc')
+  const [ordenVencimiento, setOrdenVencimiento] = useState<"asc" | "desc">("asc")
 
   const [filtroServicio, setFiltroServicio] = useState<string>("todos")
   const [filtroDisponibilidad, setFiltroDisponibilidad] = useState<string>("todas")
@@ -73,6 +94,31 @@ export function CuentasTab() {
     fecha_vencimiento: "",
     costo_personalizado: "",
   })
+
+  // Función para obtener fecha en zona horaria de Campeche, México
+  const getFechaCampeche = (date?: Date) => {
+    const fechaBase = date || new Date()
+    // Campeche, México está en UTC-6 (CST)
+    const fechaCampeche = new Date(fechaBase.toLocaleString("en-US", { timeZone: "America/Merida" }))
+    return fechaCampeche
+  }
+
+  // Función para formatear fecha como YYYY-MM-DD en zona horaria de Campeche
+  const formatearFechaCampeche = (date: Date) => {
+    const fechaCampeche = getFechaCampeche(date)
+    const year = fechaCampeche.getFullYear()
+    const month = String(fechaCampeche.getMonth() + 1).padStart(2, "0")
+    const day = String(fechaCampeche.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+  }
+
+  // Función para obtener fecha un mes después en zona horaria de Campeche
+  const getFechaUnMesDespues = () => {
+    const hoy = getFechaCampeche()
+    const unMesDespues = new Date(hoy)
+    unMesDespues.setMonth(unMesDespues.getMonth() + 1)
+    return formatearFechaCampeche(unMesDespues)
+  }
 
   // Función para obtener el próximo número disponible
   const getProximoNumeroDisponible = (servicioId: number) => {
@@ -145,12 +191,9 @@ export function CuentasTab() {
   }
 
   const resetAsignacionForm = () => {
-    const fechaDefault = new Date()
-    fechaDefault.setMonth(fechaDefault.getMonth() + 1)
-
     setAsignacionForm({
       cliente_id: "",
-      fecha_vencimiento: fechaDefault.toISOString().split("T")[0],
+      fecha_vencimiento: getFechaUnMesDespues(),
       costo_personalizado: "",
     })
     setClienteBusqueda("")
@@ -183,7 +226,10 @@ export function CuentasTab() {
       }
 
       // Generar contraseña recomendada basada en el nombre del servicio + 6 números aleatorios
-      const nombreServicio = servicio.nombre.toLowerCase().split(' ')[0].replace(/[^a-z0-9]/g, '')
+      const nombreServicio = servicio.nombre
+        .toLowerCase()
+        .split(" ")[0]
+        .replace(/[^a-z0-9]/g, "")
       const numerosAleatorios = Math.floor(100000 + Math.random() * 900000) // Genera 6 dígitos
       const passwordRecomendada = `${nombreServicio}${numerosAleatorios}`
 
@@ -200,7 +246,7 @@ export function CuentasTab() {
   const handleNumeroChange = (numero: string) => {
     setCuentaForm((prev) => ({ ...prev, numero_cuenta: numero }))
     validarNumero(cuentaForm.servicio_id, numero)
-    
+
     // Regenerar email y contraseña recomendados cuando cambia el número
     if (cuentaForm.servicio_id) {
       const servicio = servicios.find((s) => s.id === Number.parseInt(cuentaForm.servicio_id))
@@ -215,9 +261,12 @@ export function CuentasTab() {
             setCuentaForm((prev) => ({ ...prev, email: emailRecomendado }))
           }
         }
-        
+
         // Regenerar contraseña
-        const nombreServicio = servicio.nombre.toLowerCase().split(' ')[0].replace(/[^a-z0-9]/g, '')
+        const nombreServicio = servicio.nombre
+          .toLowerCase()
+          .split(" ")[0]
+          .replace(/[^a-z0-9]/g, "")
         const numerosAleatorios = Math.floor(100000 + Math.random() * 900000)
         const passwordRecomendada = `${nombreServicio}${numerosAleatorios}`
         setCuentaForm((prev) => ({ ...prev, password: passwordRecomendada }))
@@ -228,7 +277,7 @@ export function CuentasTab() {
   const handleNumeroEditChange = (numero: string) => {
     setCuentaForm((prev) => ({ ...prev, numero_cuenta: numero }))
     validarNumero(cuentaForm.servicio_id, numero, cuentaEditando?.id)
-    
+
     // Regenerar email recomendado cuando cambia el número en edición
     if (cuentaForm.servicio_id) {
       const servicio = servicios.find((s) => s.id === Number.parseInt(cuentaForm.servicio_id))
@@ -306,13 +355,18 @@ export function CuentasTab() {
         activa: cuentaForm.activa,
       }
 
+      console.log("Datos a enviar:", dataToSubmit)
+
       const { data: cuentaCreada, error: errorCuenta } = await supabase
         .from("cuentas")
         .insert([dataToSubmit])
         .select()
         .single()
 
-      if (errorCuenta) throw errorCuenta
+      if (errorCuenta) {
+        console.error("Error al crear cuenta:", errorCuenta)
+        throw errorCuenta
+      }
 
       // Check if users already exist for this account (shouldn't happen, but let's be safe)
       const { data: existingUsers, error: checkError } = await supabase
@@ -332,11 +386,22 @@ export function CuentasTab() {
           // Cuenta privada: siempre 1 perfil, sin importar el servicio
           cantidadUsuarios = 1
           console.log("Creando cuenta PRIVADA con 1 perfil")
-        } else {
+        } else if (cuentaForm.tipo_cuenta === "estandar") {
+          // Cuenta estándar: siempre exactamente 4 perfiles, sin importar el servicio
+          cantidadUsuarios = 4
+          console.log("Creando cuenta ESTÁNDAR con exactamente 4 perfiles")
+        } else if (cuentaForm.tipo_cuenta === "compartida") {
           // Cuenta compartida: usar la configuración del servicio
           cantidadUsuarios = servicio.usuarios_por_cuenta || 4
-          console.log(`Creando cuenta COMPARTIDA con ${cantidadUsuarios} perfiles`)
+          console.log(`Creando cuenta COMPARTIDA con ${cantidadUsuarios} perfiles (según servicio)`)
+        } else {
+          // Fallback por si acaso
+          cantidadUsuarios = 4
+          console.log("Usando fallback: 4 perfiles")
         }
+
+        console.log(`Tipo de cuenta seleccionado: "${cuentaForm.tipo_cuenta}"`)
+        console.log(`Cantidad de usuarios a crear: ${cantidadUsuarios}`)
 
         const usuariosData = []
 
@@ -352,6 +417,7 @@ export function CuentasTab() {
         }
 
         console.log("Datos de usuarios a crear:", usuariosData)
+        console.log(`Total de usuarios en el array: ${usuariosData.length}`)
 
         const { error: errorUsuarios } = await supabase.from("cuenta_usuarios").insert(usuariosData)
 
@@ -395,7 +461,7 @@ export function CuentasTab() {
       fecha_vencimiento: cuenta.fecha_vencimiento || "",
       precio_base: cuenta.precio_base?.toString() || cuenta.precio_mensual?.toString() || "",
       precio_cliente: cuenta.precio_cliente?.toString() || "",
-      tipo_cuenta: cuenta.tipo_cuenta || "compartida",
+      tipo_cuenta: cuenta.tipo_cuenta || "estandar",
       activa: cuenta.activa,
     })
     setNumeroError("")
@@ -441,20 +507,111 @@ export function CuentasTab() {
         activa: cuentaForm.activa,
       }
 
+      console.log("Datos a actualizar:", dataToUpdate)
+
       const { error } = await supabase.from("cuentas").update(dataToUpdate).eq("id", cuentaEditando.id)
 
-      if (error) throw error
+      if (error) {
+        console.error("Error al actualizar cuenta:", error)
+        throw error
+      }
+
+      // Ajustar perfiles según el nuevo tipo de cuenta
+      const usuariosActuales = cuentaUsuarios?.filter((u) => u.cuenta_id === cuentaEditando.id) || []
+      const usuariosOcupados = usuariosActuales.filter((u) => u.ocupado)
+
+      let cantidadUsuariosRequerida = 0
+
+      // Determinar cantidad de usuarios requerida según el nuevo tipo de cuenta
+      if (cuentaForm.tipo_cuenta === "privada") {
+        cantidadUsuariosRequerida = 1
+      } else if (cuentaForm.tipo_cuenta === "estandar") {
+        cantidadUsuariosRequerida = 4
+      } else {
+        // Compartida: usar configuración del servicio
+        cantidadUsuariosRequerida = servicio?.usuarios_por_cuenta || 4
+      }
+
+      console.log(
+        `Ajustando perfiles: actual=${usuariosActuales.length}, requerido=${cantidadUsuariosRequerida}, ocupados=${usuariosOcupados.length}`,
+      )
+
+      // Si necesitamos menos perfiles, eliminar los no ocupados
+      if (cantidadUsuariosRequerida < usuariosActuales.length) {
+        const usuariosAEliminar = usuariosActuales
+          .filter((u) => !u.ocupado && u.usuario_numero > cantidadUsuariosRequerida)
+          .map((u) => u.id)
+
+        if (usuariosAEliminar.length > 0) {
+          const { error: errorEliminar } = await supabase.from("cuenta_usuarios").delete().in("id", usuariosAEliminar)
+
+          if (errorEliminar) {
+            console.error("Error eliminando perfiles:", errorEliminar)
+          } else {
+            console.log(`Eliminados ${usuariosAEliminar.length} perfiles no ocupados`)
+          }
+        }
+
+        // Verificar si hay usuarios ocupados que exceden el límite
+        const usuariosOcupadosExcedentes = usuariosOcupados.filter((u) => u.usuario_numero > cantidadUsuariosRequerida)
+        if (usuariosOcupadosExcedentes.length > 0) {
+          toast({
+            title: "Advertencia",
+            description: `No se pueden eliminar ${usuariosOcupadosExcedentes.length} perfiles porque están ocupados. Desasígnalos primero.`,
+            variant: "destructive",
+          })
+        }
+      }
+
+      // Si necesitamos más perfiles, crearlos
+      else if (cantidadUsuariosRequerida > usuariosActuales.length) {
+        const usuariosACrear = []
+
+        // Encontrar los números de usuario que faltan
+        const numerosExistentes = usuariosActuales.map((u) => u.usuario_numero).sort((a, b) => a - b)
+        const numerosRequeridos = Array.from({ length: cantidadUsuariosRequerida }, (_, i) => i + 1)
+        const numerosFaltantes = numerosRequeridos.filter((num) => !numerosExistentes.includes(num))
+
+        // Crear perfiles para los números faltantes
+        for (const numeroUsuario of numerosFaltantes) {
+          usuariosACrear.push({
+            cuenta_id: cuentaEditando.id,
+            servicio_id: servicioId,
+            usuario_numero: numeroUsuario,
+            nombre_usuario: `Usuario ${numeroUsuario}`,
+            pin: null,
+            ocupado: false,
+          })
+        }
+
+        if (usuariosACrear.length > 0) {
+          const { error: errorCrear } = await supabase.from("cuenta_usuarios").insert(usuariosACrear)
+
+          if (errorCrear) {
+            console.error("Error creando perfiles:", errorCrear)
+            toast({
+              title: "Error",
+              description: "Error al crear los perfiles adicionales",
+              variant: "destructive",
+            })
+          } else {
+            console.log(`Creados ${usuariosACrear.length} perfiles adicionales`)
+          }
+        }
+      }
 
       toast({
         title: "Éxito",
-        description: "Cuenta actualizada correctamente",
+        description: `Cuenta actualizada correctamente a tipo ${cuentaForm.tipo_cuenta} con ${cantidadUsuariosRequerida} ${cantidadUsuariosRequerida === 1 ? "perfil" : "perfiles"}`,
       })
 
       await refreshCuentas()
+      await refreshUsuarios()
       setEditDialogOpen(false)
       setCuentaEditando(null)
       resetCuentaForm()
     } catch (error: any) {
+      console.error("Error al actualizar cuenta:", error)
       toast({
         title: "Error",
         description: error.message || "Error al actualizar la cuenta",
@@ -521,7 +678,7 @@ export function CuentasTab() {
     if (cuenta.tipo_cuenta === "privada") {
       return perfil.usuario_numero === 1
     }
-    // Si es cuenta compartida, todos los perfiles son editables
+    // Si es cuenta estándar o compartida, todos los perfiles son editables
     return true
   }
 
@@ -552,8 +709,7 @@ export function CuentasTab() {
     if (!perfilSeleccionado || !asignacionForm.cliente_id) return
 
     try {
-      const hoy = new Date()
-      const fechaHoy = new Date(hoy.getTime() - hoy.getTimezoneOffset() * 60000).toISOString().split("T")[0]
+      const fechaHoy = formatearFechaCampeche(new Date())
       const costo = asignacionForm.costo_personalizado
         ? Number.parseFloat(asignacionForm.costo_personalizado)
         : perfilSeleccionado.cuenta?.precio_cliente || 0
@@ -696,6 +852,9 @@ ${
           // Para cuentas privadas, verificar si el primer perfil está libre
           const primerPerfil = usuariosCuenta.find((u) => u.usuario_numero === 1)
           return primerPerfil && !primerPerfil.ocupado
+        } else if (cuenta.tipo_cuenta === "estandar") {
+          // Para cuentas estándar, verificar si hay perfiles libres de los 4
+          return usuariosOcupados < 4
         } else {
           // Para cuentas compartidas, verificar si hay perfiles libres
           return usuariosOcupados < usuariosCuenta.length
@@ -707,8 +866,8 @@ ${
     cuentasFiltradas = cuentasFiltradas.sort((a, b) => {
       const fechaA = a.fecha_vencimiento ? new Date(a.fecha_vencimiento).getTime() : 0
       const fechaB = b.fecha_vencimiento ? new Date(b.fecha_vencimiento).getTime() : 0
-      
-      if (ordenVencimiento === 'asc') {
+
+      if (ordenVencimiento === "asc") {
         return fechaA - fechaB
       } else {
         return fechaB - fechaA
@@ -733,8 +892,8 @@ ${
       return "text-green-600 bg-green-100 hover:bg-green-200"
     }
 
-    const hoy = new Date()
-    const vencimiento = new Date(asignacion.fecha_vencimiento_usuario)
+    const hoy = getFechaCampeche()
+    const vencimiento = new Date(asignacion.fecha_vencimiento_usuario + "T00:00:00")
     const diffTime = vencimiento.getTime() - hoy.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
@@ -881,6 +1040,7 @@ ${
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="privada">Privada (1 perfil)</SelectItem>
+                        <SelectItem value="estandar">Estándar (4 perfiles)</SelectItem>
                         <SelectItem value="compartida">Compartida (múltiples perfiles)</SelectItem>
                       </SelectContent>
                     </Select>
@@ -913,51 +1073,33 @@ ${
                     </div>
                   </div>
 
-<div className="grid grid-cols-4 items-center gap-4">
-  <Label htmlFor="email" className="text-right">
-    Correo
-  </Label>
-  <div className="col-span-3 flex items-center gap-2">
-    <Input
-      id="email"
-      type="email"
-      value={cuentaForm.email}
-      onChange={(e) => setCuentaForm({ ...cuentaForm, email: e.target.value })}
-      required
-    />
-    <Button
-      type="button"
-      variant="outline"
-      size="icon"
-      onClick={() => navigator.clipboard.writeText(cuentaForm.email)}
-    >
-      <Copy className="h-4 w-4" />
-    </Button>
-  </div>
-</div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="email" className="text-right">
+                      Email
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={cuentaForm.email}
+                      onChange={(e) => setCuentaForm({ ...cuentaForm, email: e.target.value })}
+                      className="col-span-3"
+                      required
+                    />
+                  </div>
 
-<div className="grid grid-cols-4 items-center gap-4">
-  <Label htmlFor="password" className="text-right">
-    Contraseña
-  </Label>
-  <div className="col-span-3 flex items-center gap-2">
-    <Input
-      id="password"
-      type="text"
-      value={cuentaForm.password}
-      onChange={(e) => setCuentaForm({ ...cuentaForm, password: e.target.value })}
-      required
-    />
-    <Button
-      type="button"
-      variant="outline"
-      size="icon"
-      onClick={() => navigator.clipboard.writeText(cuentaForm.password)}
-    >
-      <Copy className="h-4 w-4" />
-    </Button>
-  </div>
-</div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="password" className="text-right">
+                      Contraseña
+                    </Label>
+                    <Input
+                      id="password"
+                      type="text"
+                      value={cuentaForm.password}
+                      onChange={(e) => setCuentaForm({ ...cuentaForm, password: e.target.value })}
+                      className="col-span-3"
+                      required
+                    />
+                  </div>
 
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="vencimiento" className="text-right">
@@ -1091,16 +1233,12 @@ ${
 
             <Button
               variant="outline"
-              onClick={() => setOrdenVencimiento(ordenVencimiento === 'asc' ? 'desc' : 'asc')}
+              onClick={() => setOrdenVencimiento(ordenVencimiento === "asc" ? "desc" : "asc")}
               className="flex items-center gap-2"
             >
               <CalendarIcon className="h-4 w-4" />
               Vencimiento
-              {ordenVencimiento === 'asc' ? (
-                <ArrowUp className="h-4 w-4" />
-              ) : (
-                <ArrowDown className="h-4 w-4" />
-              )}
+              {ordenVencimiento === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
             </Button>
           </div>
         </CardHeader>
@@ -1112,7 +1250,7 @@ ${
           const usuariosCuenta = getUsuariosCuenta(cuenta.id)
           const usuariosOcupados = usuariosCuenta.filter((u) => u.ocupado).length
           const fechaVencimiento = cuenta.fecha_vencimiento ? new Date(cuenta.fecha_vencimiento) : null
-          const hoy = new Date()
+          const hoy = getFechaCampeche()
           const diasRestantes = fechaVencimiento
             ? Math.ceil((fechaVencimiento.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24))
             : null
@@ -1139,7 +1277,11 @@ ${
                       <CardTitle className="text-lg leading-tight">{cuenta.nombre}</CardTitle>
                       <div className="mt-1">
                         <Badge variant={cuenta.tipo_cuenta === "privada" ? "secondary" : "outline"} className="text-xs">
-                          {cuenta.tipo_cuenta === "privada" ? "1/1" : `${usuariosOcupados}/${usuariosCuenta.length}`}
+                          {cuenta.tipo_cuenta === "privada"
+                            ? "1/1"
+                            : cuenta.tipo_cuenta === "estandar"
+                              ? `${usuariosOcupados}/4`
+                              : `${usuariosOcupados}/${usuariosCuenta.length}`}
                         </Badge>
                       </div>
                       <CardDescription className="text-sm">{cuenta.servicio?.nombre}</CardDescription>
@@ -1164,59 +1306,40 @@ ${
               </CardHeader>
 
               <CardContent className="space-y-4">
-{/* Credenciales */}
-<div className="space-y-2">
-  {/* Correo */}
-  <div className="text-sm flex items-center gap-2">
-    <span className="text-muted-foreground">Correo:</span>
-    <p className="font-mono text-xs break-all">{cuenta.email}</p>
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      className="h-6 w-6 p-0"
-      onClick={() => navigator.clipboard.writeText(cuenta.email)}
-    >
-      <Copy className="h-3 w-3" />
-    </Button>
-  </div>
-
-  {/* Contraseña */}
-  <div className="text-sm flex items-center gap-2">
-    <span className="text-muted-foreground">Contraseña:</span>
-    <div className="flex items-center gap-2">
-      <span className="font-mono text-xs">
-        {mostrarPasswords[cuenta.id] ? cuenta.password : "••••••••"}
-      </span>
-      {/* Botón mostrar/ocultar */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => togglePasswordVisibility(cuenta.id)}
-        className="h-6 w-6 p-0"
-      >
-        {mostrarPasswords[cuenta.id] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-      </Button>
-      {/* Botón copiar contraseña */}
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="h-6 w-6 p-0"
-        onClick={() => navigator.clipboard.writeText(cuenta.password)}
-      >
-        <Copy className="h-3 w-3" />
-      </Button>
-    </div>
-  </div>
-</div>
+                {/* Credenciales */}
+                <div className="space-y-2">
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Email:</span>
+                    <p className="font-mono text-xs break-all">{cuenta.email}</p>
+                  </div>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Contraseña:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs">
+                        {mostrarPasswords[cuenta.id] ? cuenta.password : "••••••••"}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => togglePasswordVisibility(cuenta.id)}
+                        className="h-6 w-6 p-0"
+                      >
+                        {mostrarPasswords[cuenta.id] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Perfiles como íconos */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Perfiles</span>
                     <Badge variant="outline" className="text-xs">
-                      {cuenta.tipo_cuenta === "privada" ? "1/1" : `${usuariosOcupados}/${usuariosCuenta.length}`}
+                      {cuenta.tipo_cuenta === "privada"
+                        ? "1/1"
+                        : cuenta.tipo_cuenta === "estandar"
+                          ? `${usuariosOcupados}/4`
+                          : `${usuariosOcupados}/${usuariosCuenta.length}`}
                     </Badge>
                   </div>
                   <div className="grid grid-cols-4 gap-2">
@@ -1228,6 +1351,13 @@ ${
                           onClick={() => handlePerfilClick(perfil, cuenta)}
                           className={`group h-12 w-full p-2 border-2 relative ${getPerfilIconColor(perfil, cuenta)}`}
                           disabled={!isPerfilEditable(cuenta, perfil)}
+                          title={
+                            cuenta.tipo_cuenta === "privada" && perfil.usuario_numero !== 1
+                              ? "Este perfil no está disponible en cuentas privadas"
+                              : perfil.ocupado
+                                ? "Ver detalles del perfil asignado"
+                                : "Asignar este perfil a un cliente"
+                          }
                         >
                           {perfil.ocupado ? <UserCheck className="h-6 w-6" /> : <User className="h-6 w-6" />}
 
@@ -1248,7 +1378,7 @@ ${
                             {!isPerfilEditable(cuenta, perfil) && (
                               <>
                                 <br />
-                                <span className="text-xs text-gray-300">No disponible</span>
+                                <span className="text-xs text-gray-300">No disponible en cuenta privada</span>
                               </>
                             )}
                           </div>
@@ -1302,7 +1432,7 @@ ${
                   {(() => {
                     if (!cuenta.fecha_vencimiento) return null
                     const fechaVencimiento = new Date(cuenta.fecha_vencimiento)
-                    const hoy = new Date()
+                    const hoy = getFechaCampeche()
                     const diasRestantes = Math.ceil(
                       (fechaVencimiento.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24),
                     )
@@ -1347,7 +1477,7 @@ ${
                     )
                   })()}
 
-{/* 
+                  {/* 
 <div className="flex items-center justify-between text-sm">
   <span className="text-muted-foreground">Precios:</span>
   <div className="text-right">
@@ -1356,9 +1486,6 @@ ${
   </div>
 </div> 
 */}
-
-
-
                 </div>
               </CardContent>
             </Card>
@@ -1421,6 +1548,7 @@ ${
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="privada">Privada (1 perfil)</SelectItem>
+                  <SelectItem value="estandar">Estándar (4 perfiles)</SelectItem>
                   <SelectItem value="compartida">Compartida (múltiples perfiles)</SelectItem>
                 </SelectContent>
               </Select>
@@ -1449,52 +1577,33 @@ ${
               </div>
             </div>
 
-<div className="grid grid-cols-4 items-center gap-4">
-  <Label htmlFor="edit_email" className="text-right">
-    Correo
-  </Label>
-  <div className="col-span-3 flex items-center gap-2">
-    <Input
-      id="edit_email"
-      type="email"
-      value={cuentaForm.email}
-      onChange={(e) => setCuentaForm({ ...cuentaForm, email: e.target.value })}
-      required
-    />
-    <Button
-      type="button"
-      variant="outline"
-      size="icon"
-      onClick={() => navigator.clipboard.writeText(cuentaForm.email)}
-    >
-      <Copy className="h-4 w-4" />
-    </Button>
-  </div>
-</div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit_email" className="text-right">
+                Email
+              </Label>
+              <Input
+                id="edit_email"
+                type="email"
+                value={cuentaForm.email}
+                onChange={(e) => setCuentaForm({ ...cuentaForm, email: e.target.value })}
+                className="col-span-3"
+                required
+              />
+            </div>
 
-<div className="grid grid-cols-4 items-center gap-4">
-  <Label htmlFor="edit_password" className="text-right">
-    Contraseña
-  </Label>
-  <div className="col-span-3 flex items-center gap-2">
-    <Input
-      id="edit_password"
-      type="text"
-      value={cuentaForm.password}
-      onChange={(e) => setCuentaForm({ ...cuentaForm, password: e.target.value })}
-      required
-    />
-    <Button
-      type="button"
-      variant="outline"
-      size="icon"
-      onClick={() => navigator.clipboard.writeText(cuentaForm.password)}
-    >
-      <Copy className="h-4 w-4" />
-    </Button>
-  </div>
-</div>
-
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit_password" className="text-right">
+                Contraseña
+              </Label>
+              <Input
+                id="edit_password"
+                type="text"
+                value={cuentaForm.password}
+                onChange={(e) => setCuentaForm({ ...cuentaForm, password: e.target.value })}
+                className="col-span-3"
+                required
+              />
+            </div>
 
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="edit_vencimiento" className="text-right">
@@ -1544,14 +1653,17 @@ ${
       </Dialog>
 
       {/* Dialog para perfiles */}
-      <Dialog open={perfilDialogOpen} onOpenChange={(open) => {
-        setPerfilDialogOpen(open)
-        if (!open) {
-          // Cancelar edición de fecha al cerrar el dialog
-          setEditandoFecha(false)
-          setNuevaFechaVencimiento("")
-        }
-      }}>
+      <Dialog
+        open={perfilDialogOpen}
+        onOpenChange={(open) => {
+          setPerfilDialogOpen(open)
+          if (!open) {
+            // Cancelar edición de fecha al cerrar el dialog
+            setEditandoFecha(false)
+            setNuevaFechaVencimiento("")
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>{perfilSeleccionado?.ocupado ? "Perfil Ocupado" : "Asignar Perfil"}</DialogTitle>
@@ -1615,11 +1727,11 @@ ${
                                 <PopoverTrigger asChild>
                                   <Button
                                     variant="outline"
-                                    className="w-full justify-start text-left font-normal"
+                                    className="w-full justify-start text-left font-normal bg-transparent"
                                   >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
                                     {nuevaFechaVencimiento ? (
-                                      format(new Date(nuevaFechaVencimiento + 'T00:00:00'), "PPP", { locale: es })
+                                      format(new Date(nuevaFechaVencimiento + "T00:00:00"), "PPP", { locale: es })
                                     ) : (
                                       <span>Seleccionar fecha</span>
                                     )}
@@ -1628,16 +1740,15 @@ ${
                                 <PopoverContent className="w-auto p-0 max-h-80" align="start">
                                   <Calendar
                                     mode="single"
-                                    selected={nuevaFechaVencimiento ? new Date(nuevaFechaVencimiento + 'T00:00:00') : undefined}
+                                    selected={
+                                      nuevaFechaVencimiento ? new Date(nuevaFechaVencimiento + "T00:00:00") : undefined
+                                    }
                                     onSelect={(date) => {
                                       if (date) {
-                                        const year = date.getFullYear()
-                                        const month = String(date.getMonth() + 1).padStart(2, '0')
-                                        const day = String(date.getDate()).padStart(2, '0')
-                                        setNuevaFechaVencimiento(`${year}-${month}-${day}`)
+                                        setNuevaFechaVencimiento(formatearFechaCampeche(date))
                                       }
                                     }}
-                                    disabled={(date) => date < new Date()}
+                                    disabled={(date) => date < getFechaCampeche()}
                                     initialFocus
                                     className="max-h-72"
                                   />
@@ -1783,7 +1894,9 @@ ${
                   value={asignacionForm.fecha_vencimiento}
                   onChange={(e) => setAsignacionForm({ ...asignacionForm, fecha_vencimiento: e.target.value })}
                 />
-                <p className="text-xs text-muted-foreground mt-1">Por defecto se establece un mes después de hoy</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Por defecto se establece un mes después de hoy (zona horaria de Campeche)
+                </p>
               </div>
 
               <div>

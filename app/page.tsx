@@ -591,7 +591,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-6">
+      <div className="max-w-[90%] mx-auto p-6">
         {/* Enhanced Header with Integrated Tabs */}
         <div className="relative mb-8">
           {/* Background with animated gradient */}
@@ -1142,7 +1142,7 @@ export default function Dashboard() {
                     <CardContent>
                       <h2 className="text-lg font-bold mb-4">Servicios más utilizados</h2>
 
-                      <div className="space-y-4 max-h-[150px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                      <div className="space-y-4 max-h-[140px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                         {serviciosMasUtilizados.length > 0 ? (
                           serviciosMasUtilizados.map((servicio) => (
                             <div key={servicio.id} className="flex items-center justify-between">

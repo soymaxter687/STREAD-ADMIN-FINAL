@@ -1309,15 +1309,13 @@ ${
                 {/* Credenciales */}
                 <div className="space-y-2">
                   <div className="text-sm">
-                    <span className="text-muted-foreground">Email:</span>
-                    <p className="font-mono text-xs break-all">{cuenta.email}</p>
+                    <span className="text-muted-foreground">Correo:</span>
+                    <p className="text-sm break-all">{cuenta.email}</p>
                   </div>
                   <div className="text-sm">
                     <span className="text-muted-foreground">Contraseña:</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs">
-                        {mostrarPasswords[cuenta.id] ? cuenta.password : "••••••••"}
-                      </span>
+                      <span className="text-sm">{mostrarPasswords[cuenta.id] ? cuenta.password : "••••••••"}</span>
                       <Button
                         variant="ghost"
                         size="sm"

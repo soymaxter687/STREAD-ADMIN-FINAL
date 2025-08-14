@@ -1310,7 +1310,21 @@ ${
                 <div className="space-y-2">
                   <div className="text-sm">
                     <span className="text-muted-foreground">Correo:</span>
-                    <p className="text-sm break-all">{cuenta.email}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm break-all flex-1">{cuenta.email}</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyToClipboard(cuenta.email, `email-${cuenta.id}`)}
+                        className="h-6 w-6 p-0"
+                      >
+                        {copiedItems[`email-${cuenta.id}`] ? (
+                          <Check className="h-3 w-3 text-green-600" />
+                        ) : (
+                          <Copy className="h-3 w-3" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                   <div className="text-sm">
                     <span className="text-muted-foreground">Contraseña:</span>
@@ -1323,6 +1337,18 @@ ${
                         className="h-6 w-6 p-0"
                       >
                         {mostrarPasswords[cuenta.id] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyToClipboard(cuenta.password, `password-${cuenta.id}`)}
+                        className="h-6 w-6 p-0"
+                      >
+                        {copiedItems[`password-${cuenta.id}`] ? (
+                          <Check className="h-3 w-3 text-green-600" />
+                        ) : (
+                          <Copy className="h-3 w-3" />
+                        )}
                       </Button>
                     </div>
                   </div>
